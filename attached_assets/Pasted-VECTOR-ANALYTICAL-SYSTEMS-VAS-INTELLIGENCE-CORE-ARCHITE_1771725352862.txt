@@ -1,0 +1,280 @@
+VECTOR ANALYTICAL SYSTEMS (VAS)
+INTELLIGENCE CORE ARCHITECTURE DIRECTIVE
+VERSION: AUTONOMOUS DETERMINISTIC PREDICTIVE ENGINE
+
+OBJECTIVE:
+Separate the predictive intelligence layer into its own logical container
+called the Intelligence Core while preserving the video generation pipeline
+as a demonstration harness.
+
+Video creation becomes a PRODUCT DISPLAY LAYER.
+Intelligence Core becomes the PRODUCT.
+
+============================================================
+ARCHITECTURE STRUCTURE
+============================================================
+
+/intelligence-core
+   /datasets
+   /feature-engineering
+   /model-training
+   /prediction
+   /optimization
+   /trend-analysis
+   /exploration
+   /validation
+   /drift-detection
+
+/video-engine
+   /ad-generation
+   /tts
+   /image-gen
+   /render
+
+Video engine must call Intelligence Core via internal API.
+
+============================================================
+SECTION 1 — DATASET ABSTRACTION
+============================================================
+
+Create tables:
+
+datasets
+dataset_records
+engineered_features
+pattern_models
+prediction_logs
+trend_signals
+model_snapshots
+experiment_groups
+
+Dataset types initially:
+- video_ads_vectoros
+- video_ads_outpost
+
+Each dataset operates independently.
+
+============================================================
+SECTION 2 — FEATURE ENGINEERING
+============================================================
+
+For video datasets extract:
+
+- setupDuration
+- punchlineTiming
+- duration
+- deliveryPaceWps
+- toneShiftDensity
+- escalationDensity
+- retentionSlope
+- retentionDropPoint
+- wordCount
+- platformEncoding
+- categoryEncoding
+- historicalPerformanceDelta
+
+Normalize all features to 0–1 scale.
+
+Feature extractors must be pluggable by datasetType.
+
+============================================================
+SECTION 3 — MODEL TRAINING
+============================================================
+
+Use deterministic multivariate regression.
+
+Implement:
+
+- 80/20 split
+- R²
+- MAE
+- Tier classification accuracy
+- Directional accuracy
+
+Store coefficients and metrics in pattern_models.
+
+Create training endpoint:
+
+POST /api/intelligence/train/:datasetId
+
+============================================================
+SECTION 4 — PRE-RELEASE PREDICTION SNAPSHOT
+============================================================
+
+Before video render:
+
+1. Generate feature vector.
+2. Run prediction.
+3. Create immutable snapshot record:
+
+model_snapshots
+  id
+  datasetId
+  featureVector
+  coefficientsUsed
+  predictedValue
+  predictedTier
+  confidence
+  hashSignature
+  createdAt
+
+4. Lock snapshot.
+5. Return prediction to UI.
+
+Video render proceeds unchanged.
+
+============================================================
+SECTION 5 — MANUAL UPLOAD CONFIRMATION
+============================================================
+
+Add endpoint:
+
+POST /api/intelligence/confirm-upload/:snapshotId
+
+User manually confirms upload.
+
+System starts performance tracking window.
+
+============================================================
+SECTION 6 — VALIDATION LOOP
+============================================================
+
+After performance data entered:
+
+POST /api/intelligence/validate/:snapshotId
+
+System compares:
+- predicted vs actual
+- compute error
+- update rolling accuracy
+- log in prediction_logs
+
+============================================================
+SECTION 7 — EXPLORATION VS EXPLOITATION ENGINE
+============================================================
+
+Implement epsilon-greedy model:
+
+epsilon default = 0.15
+
+For each new video:
+- 85% use top predicted structural configuration
+- 15% mutate structure parameters randomly within bounds
+
+Mutation parameters:
+- setup timing shift
+- punchline timing shift
+- tone shift density
+- escalation density
+- pacing adjustments
+
+Log experiment group in experiment_groups table.
+
+============================================================
+SECTION 8 — PATTERN RETIREMENT LOGIC
+============================================================
+
+If pattern:
+- Underperforms baseline by > 1.5 std dev
+- Across minimum 5 samples
+
+Mark pattern as "retired".
+
+Exclude from exploitation pool.
+
+============================================================
+SECTION 9 — DRIFT DETECTION
+============================================================
+
+Implement rolling window analysis:
+
+If predicted lift > actual lift consistently over 10 samples:
+- Reduce model confidence
+- Trigger retraining
+
+If engagement mean drops > 2 std dev:
+- Trigger exploration weight increase temporarily.
+
+============================================================
+SECTION 10 — TREND ANALYSIS
+============================================================
+
+Track:
+
+- View velocity (views/hour first 48h)
+- Engagement velocity
+- Retention-weighted engagement
+
+Use:
+
+- Rolling mean
+- Z-score anomaly detection
+- Acceleration
+
+Store in trend_signals.
+
+============================================================
+SECTION 11 — OPTIMIZATION ENGINE
+============================================================
+
+Given feature vector:
+
+Simulate small deltas.
+Recalculate prediction.
+Return projected lift.
+
+Optimization suggestions must include:
+
+- exact feature change
+- predicted gain
+- confidence
+
+============================================================
+SECTION 12 — SUCCESS METRICS
+============================================================
+
+System success defined by:
+
+- Directional accuracy > 70%
+- Tier classification > 65%
+- Demonstrated uplift between optimized vs exploration group
+- Increasing rolling R² over time
+
+Video dataset is demonstration only.
+
+Intelligence core must remain dataset-agnostic.
+
+============================================================
+SECTION 13 — LONG TERM EXTENSIBILITY
+============================================================
+
+Engine must allow:
+
+registerDatasetType(datasetType, featureExtractor, targetMetricDefinition)
+
+Future datasets could include:
+
+- marketplace_conversion
+- product_launch_velocity
+- business_strategy_outcomes
+- stock_metric_prediction (with disclaimers)
+
+Core must not contain video-specific assumptions.
+
+============================================================
+END STATE
+============================================================
+
+Vector Analytical Systems becomes:
+
+A deterministic, explainable,
+autonomous predictive modeling engine
+with controlled exploration,
+pattern retirement,
+drift detection,
+and pre-release prediction logging.
+
+Video is proof of intelligence.
+Not the product.
+
+END DIRECTIVE.

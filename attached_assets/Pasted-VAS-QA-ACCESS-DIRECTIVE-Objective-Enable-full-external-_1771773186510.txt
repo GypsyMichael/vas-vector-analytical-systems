@@ -1,0 +1,123 @@
+VAS QA ACCESS DIRECTIVE
+
+Objective:
+Enable full external crawl and API testing for ChatGPT QA audit without permanently weakening production security.
+
+====================================================
+STEP 1 — Enable Temporary QA Mode (ENV FLAG)
+====================================================
+
+In server entry file (Express app):
+
+Add:
+
+const QA_MODE = process.env.QA_MODE === "true";
+
+====================================================
+STEP 2 — Relax Security Headers in QA Mode
+====================================================
+
+If using helmet or custom headers:
+
+if (QA_MODE) {
+  app.use((req, res, next) => {
+    res.removeHeader("X-Frame-Options");
+    res.removeHeader("Content-Security-Policy");
+    res.removeHeader("X-Content-Type-Options");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    next();
+  });
+}
+
+This prevents crawler blocking.
+
+====================================================
+STEP 3 — Add Server-Side Rendered Diagnostic Route
+====================================================
+
+Add a non-React HTML diagnostic endpoint:
+
+app.get("/qa-map", async (req, res) => {
+  const routes = app._router.stack
+    .filter(r => r.route)
+    .map(r => r.route.path);
+
+  res.json({
+    status: "QA ACTIVE",
+    routes,
+    timestamp: new Date()
+  });
+});
+
+This allows route discovery.
+
+====================================================
+STEP 4 — Add Auth Bypass for QA_MODE
+====================================================
+
+In auth middleware:
+
+if (QA_MODE) {
+  req.user = { role: "admin", qa: true };
+  return next();
+}
+
+This allows full feature access.
+
+====================================================
+STEP 5 — Add API Health Endpoint
+====================================================
+
+app.get("/qa-health", async (req, res) => {
+  try {
+    res.json({
+      server: "online",
+      database: "connected",
+      uptime: process.uptime()
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+====================================================
+STEP 6 — Add Data Snapshot Endpoint
+====================================================
+
+app.get("/qa-data-summary", async (req, res) => {
+  try {
+    const tableCounts = {};
+    // Query each major table count here
+    res.json({ tableCounts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+====================================================
+STEP 7 — DEPLOY TEMPORARY QA VERSION
+====================================================
+
+Set environment variable in Replit:
+
+QA_MODE=true
+
+Redeploy.
+
+====================================================
+STEP 8 — SEND CHATGPT:
+
+1. URL
+2. Confirmation QA_MODE=true
+3. Confirmation React build is deployed
+4. Any test dataset notes
+
+====================================================
+IMPORTANT
+====================================================
+
+After audit:
+Remove QA_MODE or set to false.
+Redeploy to restore full security.
+
+END DIRECTIVE.

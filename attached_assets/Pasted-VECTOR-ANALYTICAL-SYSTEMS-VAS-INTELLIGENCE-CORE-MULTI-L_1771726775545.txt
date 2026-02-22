@@ -1,0 +1,281 @@
+VECTOR ANALYTICAL SYSTEMS (VAS)
+INTELLIGENCE CORE – MULTI-LAYER SIGNAL INGESTION EXPANSION
+
+OBJECTIVE:
+Expand the Intelligence Core beyond video performance modeling into a
+multi-layer trend detection and attention migration engine.
+
+We do NOT follow money.
+We detect attention before money moves.
+We do NOT copy ads.
+We detect emerging patterns before ads react.
+
+All integrations must prioritize:
+- Free or publicly accessible APIs
+- High-frequency updating datasets
+- Chronological trend signals
+- Legal usage
+- Scalable ingestion
+
+============================================================
+ARCHITECTURAL PRINCIPLE
+============================================================
+
+Attention moves in layers.
+
+Layer 1: Cultural Noise
+Layer 2: Search Intent
+Layer 3: Consideration Signals
+Layer 4: Purchase Behavior
+Layer 5: Media Amplification
+Layer 6: Paid Competition
+
+Engine must ingest signals from multiple layers and detect:
+- Cross-layer acceleration
+- Sequential correlation
+- Lag relationships
+- Attention migration velocity
+
+============================================================
+NEW CORE MODULE
+============================================================
+
+Create directory:
+
+/intelligence-core/signal-ingestion
+
+Each data source registers:
+
+registerSignalSource({
+  name,
+  layer,
+  fetchFunction,
+  normalizationFunction,
+  featureExtractor,
+  updateFrequency
+})
+
+============================================================
+PHASE 1 — FREE HIGH-SIGNAL DATASETS
+============================================================
+
+LAYER 1 — CULTURAL NOISE
+
+1. Reddit API
+   - Subreddit post volume
+   - Upvote velocity
+   - Comment velocity
+   - Topic keyword frequency
+   - Subreddit growth rate
+
+2. Wikipedia Pageviews API
+   - Pageview velocity
+   - Topic acceleration
+   - 7-day change
+   - 30-day change
+
+3. NewsAPI / GNews (free tier)
+   - Article frequency by keyword
+   - Sentiment polarity
+   - Topic clustering frequency
+
+Purpose:
+Detect early cultural spikes before monetization.
+
+------------------------------------------------------------
+
+LAYER 2 — SEARCH INTENT
+
+4. Google Trends (via unofficial API)
+   - Search interest over time
+   - Regional interest
+   - Related rising queries
+   - Keyword acceleration
+
+Purpose:
+Search intent precedes buying behavior.
+
+------------------------------------------------------------
+
+LAYER 3 — CONSIDERATION SIGNALS
+
+5. Amazon Best Seller Rank (public scraping with rate limiting)
+   - Rank delta over time
+   - Review velocity
+   - Rating shifts
+   - Category momentum
+
+6. eBay API (public marketplace data)
+   - Completed listing frequency
+   - Bid activity density
+   - Price movement
+
+Purpose:
+Signal buyer attention before large ad competition.
+
+------------------------------------------------------------
+
+LAYER 4 — MEDIA AMPLIFICATION
+
+7. YouTube Data API
+   - View velocity (first 48h)
+   - Engagement velocity
+   - Topic clustering
+   - Channel growth rate
+
+8. TikTok public scrape (where legally compliant)
+   - View acceleration
+   - Like ratio
+   - Comment velocity
+
+Purpose:
+Detect topic amplification stage.
+
+============================================================
+PHASE 2 — SIGNAL NORMALIZATION
+============================================================
+
+All signals must convert into standardized feature metrics:
+
+- velocity (first derivative)
+- acceleration (second derivative)
+- relative deviation from rolling mean
+- cross-layer correlation lag
+- anomaly z-score
+- attention density score
+
+Create table:
+
+external_signals
+
+id UUID PK
+sourceName TEXT
+layer INTEGER
+timestamp TIMESTAMP
+normalizedFeatures JSONB
+rawData JSONB
+
+============================================================
+PHASE 3 — CROSS-LAYER CORRELATION ENGINE
+============================================================
+
+Create service:
+
+/intelligence-core/correlationEngine.ts
+
+Responsibilities:
+
+- Detect lag relationships between layers
+- Identify when Layer 1 spike precedes Layer 2 spike
+- Identify when Layer 2 spike precedes Layer 3 spike
+- Calculate cross-layer correlation strength
+- Compute leading indicator score
+
+Store results in:
+
+cross_layer_patterns
+
+id UUID PK
+signalCombination JSONB
+lagDays INTEGER
+correlationStrength REAL
+confidence REAL
+lastObserved TIMESTAMP
+
+============================================================
+PHASE 4 — ATTENTION MIGRATION INDEX (AMI)
+============================================================
+
+Create composite score:
+
+AMI (Attention Migration Index)
+
+AMI formula components:
+
+- Cultural Spike Score
+- Search Acceleration Score
+- Marketplace Rank Delta Score
+- Media Amplification Score
+
+Weight dynamically based on correlation history.
+
+Return:
+
+{
+  AMI: number,
+  stage: "early_noise" | "search_growth" | "buyer_interest" | "media_amplification",
+  confidence: number
+}
+
+============================================================
+PHASE 5 — INTEGRATION WITH VIDEO DATASET
+============================================================
+
+Before generating a video for a topic:
+
+1. Query AMI score.
+2. If AMI indicates early-stage growth:
+   - Increase exploitation weight.
+3. If AMI indicates saturated stage:
+   - Increase exploration weight.
+
+Video becomes:
+A probe deployed into emerging attention zones.
+
+============================================================
+PHASE 6 — AUTONOMOUS EXPLORATION ADJUSTMENT
+============================================================
+
+Modify epsilon-greedy model:
+
+If AMI rising:
+  decrease epsilon (exploit advantage)
+
+If AMI uncertain:
+  increase epsilon (explore)
+
+If AMI saturated:
+  increase mutation weight
+
+============================================================
+PHASE 7 — DATA INTEGRITY RULES
+============================================================
+
+- All external fetches must log timestamp.
+- Rate limits must be respected.
+- No illegal scraping.
+- All APIs modular.
+- Signals decoupled from prediction engine.
+- Intelligence Core must remain dataset-agnostic.
+
+============================================================
+LONG-TERM EXTENSION
+============================================================
+
+Future integrations:
+
+- Shopify store APIs (licensed users only)
+- Marketplace conversion APIs
+- Private sales funnel metrics
+- SEC EDGAR filings
+- Alpha Vantage (macro signal layer)
+
+Public data fuels pattern detection.
+Private data builds moat.
+
+============================================================
+GOAL
+============================================================
+
+Build a multi-layer attention detection engine that:
+
+- Detects emerging trends before monetization
+- Correlates cultural noise to search to buying
+- Deploys media strategically
+- Improves predictive accuracy over time
+- Learns lag relationships automatically
+
+Video remains proof-of-intelligence.
+Signal ingestion becomes fuel source.
+
+END DIRECTIVE.

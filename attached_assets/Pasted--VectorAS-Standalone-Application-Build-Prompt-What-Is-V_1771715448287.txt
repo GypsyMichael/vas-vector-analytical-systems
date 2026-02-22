@@ -1,0 +1,1662 @@
+# VectorAS — Standalone Application Build Prompt
+
+## What Is VectorAS?
+
+VectorAS (Vector Ad Studio) is an **AI-powered video production studio and comedy analytics engine** — a standalone platform that creates short-form video advertisements with AI-generated scripts, voiceover, scene images, and automated video assembly, while simultaneously tracking humor performance with deep structural anatomy metrics. Think of it as "an AI ad agency for blue-collar brands" — it can run as its own application with its own UI and user accounts, AND it exposes REST APIs + embeddable widgets so other platforms can integrate ad production and analytics functionality.
+
+VectorAS is **not a marketplace**. It doesn't have listings, search, or discovery. It is the engine that produces advertisements and analyzes their comedy performance. A marketplace like Outpost Exchange uses VectorAS to power its internal ad studio, but VectorAS itself is brand-agnostic — its default personality is tuned for sarcastic, masculine, blue-collar contractor humor, but the CTA and brand context are configurable per-tenant.
+
+### Core Capabilities
+
+1. **Ad Script Generation** — AI creates 8-15 second video ad scripts following a locked 3-scene structure (PRESSURE SETUP, EGO/WALLET REACTION, CONTRACT SIGNED) across 10 humor categories
+2. **Comparison Ad Generation** — Before/after "pain vs. solution" ad scripts across 8 contractor irritant templates
+3. **Voiceover Production** — OpenAI TTS-1 with "onyx" voice (deep bass male) generates narration audio
+4. **Scene Image Generation** — GPT-Image-1 creates photorealistic scene images in industrial grey style
+5. **Video Assembly** — FFmpeg assembles final videos with zoompan Ken Burns effects, crossfade transitions, text overlays, dark steel borders, and audio mixing
+6. **Comedy Analytics (Humor Screener)** — Tracks structural anatomy of humor performance: setup timing, punchline timing, delivery pace, tone arcs, retention curves, escalation beats
+7. **Competitor Research** — YouTube Data API v3 scans for competitor content, auto-imports benchmarks, optional AI humor analysis
+8. **AI Copy Assistant** — Conversation-driven copywriting tool for marketing content across platforms
+9. **YouTube Upload** — OAuth2 flow with AI-generated metadata for direct publishing
+10. **Generic Video Pipeline** — Separate pipeline for campaign-based video ads with queue system
+11. **Environment Discovery** — When embedded, automatically crawls and analyzes the host platform to identify products, services, brand identity, and target audience
+12. **Adaptive Content Intelligence** — Dynamically generates research queries based on discovered products, not hardcoded search terms
+13. **Evolving Knowledge Base** — Learns from performance data, user-promoted research, and web searches to continuously improve content strategy
+14. **Audience Calibration** — Adapts humor style, tone, and content approach based on the specific audience for each product and platform
+
+---
+
+## Architecture: Three Modes of Operation
+
+### 1. Standalone Web Application
+- Full React frontend with its own auth, dashboard, and production UI
+- Users create accounts (phone-verified identity)
+- Users can generate ads, track performance, research competitors, and produce copy directly
+- Landing page at root (`/`) explaining what VectorAS is
+
+### 2. REST API Service
+- External platforms authenticate via API keys
+- All production and analytics operations available as REST endpoints
+- Platforms pass their own user identifiers mapped to VectorAS accounts
+- Webhook callbacks for pipeline completion events
+
+### 3. Embeddable Widgets (iframe)
+- Drop-in production pipeline widget
+- Drop-in analytics dashboard widget
+- Drop-in copy assistant widget
+- Host sites embed via `<iframe>` with configuration parameters
+- Widgets communicate with host via `postMessage`
+
+---
+
+## Tech Stack
+
+- **Frontend**: React (web SPA — NOT React Native, NOT Expo)
+- **Backend**: Express.js + TypeScript
+- **Database**: PostgreSQL with Drizzle ORM
+- **AI Models**:
+  - GPT-4.1 — Script generation, analytics suggestions, humor analysis, chat modification
+  - GPT-4.1-nano — YouTube metadata, scene breakdown, comparison scenario generation
+  - GPT-Image-1 — Scene image generation (photorealistic, industrial grey style)
+  - TTS-1 with "onyx" voice — Voiceover narration (deep bass male)
+- **Video**: FFmpeg (video assembly, zoompan effects, crossfade transitions, text overlays, audio mixing)
+- **Research**: YouTube Data API v3 (search.list + videos.list)
+- **Auth**: Token-based (Bearer) with bcrypt password hashing, phone verification as identity anchor
+- **Styling**: Industrial grey/dark steel palette — "Dark Steel & Sarcasm"
+
+---
+
+## Brand Identity — "Dark Steel & Sarcasm"
+
+### Visual Language
+Industrial, masculine, muted. Like a machine shop control panel, not a design agency. Every surface is flat dark steel. Every interaction feels deliberate and mechanical. No softness, no whimsy, no corporate polish.
+
+### Color Palette
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--steel-bg` | `#1C1F24` | Page backgrounds |
+| `--steel-surface` | `#2A2F36` | Card backgrounds, panels |
+| `--steel-border` | `#3A3F46` | Borders, dividers |
+| `--chrome-text` | `#E8EAED` | Primary text |
+| `--chrome-dim` | `#8A8F96` | Secondary text, labels |
+| `--chrome-muted` | `#5A5F66` | Tertiary text, disabled |
+| `--industrial-blue` | `#4A90D9` | Primary actions, links |
+| `--alert-red` | `#D94A4A` | Destructive, errors, failures |
+| `--success-green` | `#4AD97A` | Success states, completed |
+| `--warning-amber` | `#D9A84A` | Warnings, in-progress |
+
+### Typography
+- Headers: Monospace/industrial font (e.g., "JetBrains Mono" or "Source Code Pro") — UPPERCASE for section headings
+- Body: Clean sans-serif (e.g., "Inter" or system font stack)
+- Minimal border-radius (2-4px) — sharp industrial edges
+- No emojis anywhere in the UI
+- No gradients — flat matte dark surfaces
+
+### Logo Concept
+- Stylized "V" with a play-button triangle embedded — suggests both "vector" and video production
+- Can render as monochrome steel stamp on dark background
+
+### Tone of Voice
+- Sarcastic, dry, masculine
+- "The kind of joke a foreman tells at 6am that makes the whole crew laugh"
+- NOT sanitized, NOT corporate, NOT motivational
+- Bar talk, not board room
+- The brand arrives at the end as the logical punchline — never the interruption
+- Target audience: tradesmen, contractors, blue-collar workers
+- Humor register: crude, direct, jobsite-authentic
+
+---
+
+## Environment Discovery Engine
+
+When VectorAS is embedded in a host platform, it must automatically understand its environment — what the platform sells, who the audience is, what the brand identity looks like, and what content strategies would be most effective. This is not optional configuration — VectorAS figures this out itself.
+
+### Host Platform Analysis
+
+When a host platform connects (via API key registration or widget embed), VectorAS performs an initial environment scan:
+
+1. **Platform Crawl** — Fetches and analyzes the host platform's public-facing pages
+   - Homepage, product/service pages, about page, category pages
+   - Extracts: platform name, industry, product types, brand language, pricing model
+   - Uses GPT-4.1 to classify the platform type and industry
+
+2. **Product/Service Inventory** — Discovers and catalogs items the user sells
+   - For marketplaces (Outpost Exchange, Etsy): crawls listing/product pages, extracts titles, descriptions, categories, prices
+   - For storefronts (Shopify, WooCommerce): crawls product catalog via public pages or API
+   - For service providers: identifies services offered, service areas, specialties
+   - Stores discovered items in `product_inventory` table with AI-generated tags and category assignments
+
+3. **Brand Identity Extraction** — Analyzes the visual and verbal identity
+   - Extracts dominant colors, typography patterns, tone of voice from page content
+   - Classifies brand personality: professional, casual, luxury, blue-collar, technical, playful, etc.
+   - Identifies target demographic from content language and imagery context
+   - Stores in `environment_profiles` table
+
+4. **Audience Profiling** — Determines who the customers are
+   - Infers audience from product types, price points, brand language, and industry
+   - Creates audience segments with demographics, pain points, humor preferences
+   - Maps audience to content strategy recommendations
+
+### Environment Profile Schema
+
+The discovery engine produces an `environment_profile` that drives all content generation:
+
+```
+{
+  platformName: "Joe's Custom Woodwork",
+  platformType: "shopify_store",
+  industry: "custom_furniture",
+  productCategories: ["dining_tables", "shelving", "cutting_boards"],
+  brandPersonality: "craftsman_authentic",
+  toneProfile: { primary: "proud_craftsman", secondary: "dry_humor", avoid: ["corporate", "salesy"] },
+  audienceProfile: {
+    primary: "homeowners_30_55",
+    interests: ["home_improvement", "quality_craftsmanship", "buy_local"],
+    painPoints: ["mass_produced_furniture", "ikea_quality", "finding_custom_work"],
+    humorPreferences: ["self_deprecating", "craft_pride", "quality_vs_cheap"]
+  },
+  discoveredProducts: [
+    { id: "prod_1", name: "Live Edge Walnut Table", category: "dining_tables", price: 2400, description: "..." },
+    ...
+  ],
+  suggestedContentAngles: [
+    "craftsmanship_vs_factory",
+    "behind_the_scenes_process",
+    "customer_reactions",
+    "material_sourcing_stories"
+  ],
+  lastCrawledAt: "2026-02-21T...",
+  crawlFrequency: "weekly"
+}
+```
+
+### Manual Override
+
+Users can always manually describe their products and brand if they don't want automatic discovery, or to supplement what the crawler found. The AI should ask clarifying questions during onboarding if the crawl data is incomplete.
+
+### Re-Discovery
+
+Environment profiles are refreshed on a configurable schedule (default: weekly). The system detects new products, removed products, and changes in brand messaging. Users receive notifications when significant changes are detected.
+
+---
+
+## Adaptive Research Engine
+
+The research engine replaces hardcoded search queries with dynamically generated queries based on the discovered environment. When VectorAS knows what you sell, it knows what to research.
+
+### Dynamic Query Generation
+
+When an environment profile exists, the AI generates research queries tailored to the specific products and audience:
+
+1. **Product-Specific Queries** — Generated from discovered product inventory
+   - Example: If the platform sells custom furniture → "custom woodworking marketing videos", "furniture maker ads that work", "handmade furniture viral content"
+   - Example: If it's Outpost Exchange → "contractor humor shorts", "blue collar comedy tiktok" (the existing defaults)
+   - Example: If it's a pet supply store → "pet product marketing videos", "funny dog owner ads", "pet store viral content"
+
+2. **Audience-Specific Queries** — Based on identified audience segments
+   - Searches for content that resonates with the specific demographic
+   - Example: Homeowners 30-55 interested in home improvement → "home renovation humor", "DIY vs professional funny"
+
+3. **Competitor Queries** — Based on industry and platform type
+   - Searches for competitor advertising strategies
+   - Example: Custom furniture → "west elm ads", "etsy furniture shop marketing", "wayfair competitor ads"
+
+4. **Trend Queries** — Current trends in the relevant industry
+   - Searches for viral content patterns in the product's market
+   - Updated periodically as trends shift
+
+### Research Sources
+
+The research engine searches multiple sources, not just YouTube:
+
+1. **YouTube Data API v3** — Video content research (existing functionality, now with dynamic queries)
+2. **Web Search API** — Broader market intelligence via web search
+   - Uses search API to find articles, blog posts, case studies about what marketing works for specific product types
+   - Extracts insights about audience preferences, successful content formats, trending topics
+3. **Platform-Specific Research** — When embedded in a known platform type
+   - Shopify: researches successful Shopify store marketing strategies
+   - Etsy: researches Etsy seller advertising patterns
+   - Marketplace: researches marketplace advertising approaches
+
+### Query Storage and Learning
+
+All research queries and their results are stored:
+- `research_queries` table tracks: query text, source, results found, relevance score, user-promoted flag
+- Successful queries (high relevance results) are weighted higher in future research
+- Failed queries (no useful results) are deprioritized
+- System learns which query patterns produce the best intelligence over time
+
+### Fallback Behavior
+
+When no environment profile exists (standalone mode without embedding):
+- Uses the 12 default contractor humor queries (existing behavior)
+- Users can manually provide product/brand information to trigger adaptive research
+- The system prompts users during onboarding to describe what they sell
+
+---
+
+## Evolving Knowledge Base
+
+VectorAS maintains a persistent, growing knowledge base that gets smarter over time. Static AI dies in marketing — VectorAS is designed to evolve.
+
+### Knowledge Sources
+
+1. **Performance Feedback Loop** — Every video produced generates data
+   - Which humor styles get the most engagement for which products
+   - Which visual styles resonate with which audiences
+   - Which CTAs convert best in which contexts
+   - Structural anatomy patterns that work (setup timing, punchline timing, pace)
+   - All stored in `humor_performance` with product/environment context
+
+2. **User-Promoted Research** — Users can tell the AI to learn something new
+   - "Research what kind of ads work for handmade soap"
+   - "Find out what's trending in contractor marketing right now"
+   - "Look up how furniture stores advertise on TikTok"
+   - The AI generates research queries, executes them, distills findings, and stores insights
+   - Stored in `knowledge_entries` table with source attribution and confidence scores
+
+3. **Automated Web Intelligence** — Scheduled web searches for market trends
+   - Monitors trending content in relevant industries
+   - Tracks competitor advertising changes
+   - Identifies emerging humor patterns and content formats
+   - Runs on configurable schedule (default: daily for active accounts)
+
+4. **Cross-Tenant Learning** (anonymized) — In multi-tenant mode
+   - Aggregate performance patterns across all tenants (anonymized)
+   - "Short-form ads under 12 seconds outperform longer ads by 40% across all industries"
+   - Individual tenant data is never shared — only statistical patterns
+
+### Knowledge Entry Schema
+
+```
+{
+  id: "ke_...",
+  source: "user_promoted" | "performance_data" | "web_research" | "cross_tenant",
+  category: "humor_style" | "audience_preference" | "content_format" | "trend" | "competitor_insight",
+  environmentId: "env_..." (nullable — null for universal insights),
+  title: "Short-form furniture ads perform best with craft-pride humor",
+  content: "Analysis of 47 furniture maker ads shows that ads highlighting the craft process (wood selection, joinery, finishing) with self-deprecating humor about perfectionism generate 3.2x more engagement than product-showcase ads...",
+  confidence: 0.82,
+  sources: ["youtube_research_scan_2026_02_15", "performance_data_analysis"],
+  tags: ["furniture", "craft_humor", "short_form", "engagement"],
+  appliedCount: 12,
+  lastAppliedAt: "2026-02-20T...",
+  createdAt: "2026-02-15T...",
+  expiresAt: "2026-08-15T..." (6-month default TTL, refreshed on use)
+}
+```
+
+### Knowledge Decay
+
+- Knowledge entries have a default 6-month TTL
+- TTL resets every time the knowledge is applied to content generation
+- Entries that are never applied gradually decay and are eventually archived
+- Users can pin critical knowledge entries to prevent decay
+- Trend-based knowledge has a shorter TTL (30 days) since trends move fast
+
+### User-Promoted Query Workflow
+
+```
+User: "Research what kind of ads work best for selling power tools"
+
+VectorAS:
+1. Generates 5-8 research queries:
+   - "power tool marketing videos high engagement"
+   - "power tools viral ads tiktok"
+   - "DeWalt Milwaukee ad strategy"
+   - "tool review channels successful formats"
+   - "hardware store advertising what works"
+
+2. Executes queries via YouTube Data API and web search
+
+3. Analyzes results with GPT-4.1:
+   - Identifies content patterns that get high engagement
+   - Classifies humor styles that work
+   - Notes video lengths, formats, and visual styles
+   - Extracts audience response patterns
+
+4. Distills into knowledge entries:
+   - "Power tool ads with hands-on demo + humor outperform product-only showcase"
+   - "45-second comparison format (cheap tool vs pro tool) generates highest engagement"
+   - "Audience responds to 'right tool for the job' pride messaging"
+
+5. Stores knowledge entries in database
+
+6. Reports findings to user in plain language
+
+7. Future content generation automatically incorporates these insights
+```
+
+---
+
+## Audience Intelligence Engine
+
+VectorAS doesn't just make one kind of video. It calibrates its content approach — humor style, tone, visual language, and messaging — to match the specific audience for each product and platform.
+
+### Dynamic Humor Calibration
+
+The 10 locked humor categories (girlfriend_expensive, wife_expensive, etc.) are the **default library** for blue-collar contractor audiences. When VectorAS is serving a different audience, it generates audience-appropriate content strategies:
+
+- **Blue-collar contractors** (Outpost Exchange) → Use the 10 locked categories as-is. Crude, jobsite-authentic, masculine humor.
+- **Handmade craft sellers** (Etsy store) → Generate craft-pride humor, maker vs. mass-produced jokes, "perfectionist craftsman" self-deprecation
+- **Power tool retailers** (Shopify store) → Generate tool-comparison humor, "right tool for the job" pride, DIY disaster vs. pro results
+- **Pet supply shops** → Generate pet-parent humor, "my dog runs my life" relatability, pet personality comedy
+- **Professional services** (law firm, accounting) → Generate industry-specific professional humor, jargon comedy, client interaction stories
+
+### Content Strategy Generation
+
+For each environment profile, VectorAS generates a `content_strategy`:
+
+```
+{
+  environmentId: "env_...",
+  audienceSegments: [
+    {
+      name: "homeowners_renovating",
+      humorStyles: ["before_after_contrast", "diy_disaster", "budget_reality"],
+      toneRange: { min: "self_deprecating", max: "sarcastic", avoid: ["crude", "offensive"] },
+      contentFormats: ["comparison_ads", "transformation_reveals", "behind_the_scenes"],
+      optimalDuration: { min: 8, max: 15, sweet_spot: 12 },
+      bestPlatforms: ["instagram_reels", "tiktok", "youtube_shorts"]
+    }
+  ],
+  generatedCategories: [
+    {
+      id: "budget_reality",
+      name: "Budget Reality Check",
+      visualTemplate: "Split screen: Pinterest inspiration board vs. actual quote. Price tag zoom.",
+      directive: "The homeowner shows their Pinterest board. The contractor shows the real price. The gap is the comedy. Resolution: they find a reasonable middle ground through the platform."
+    },
+    ...
+  ],
+  ctaTemplates: [
+    "Skip the Pinterest fantasy. Find real craftsmen at real prices on {platformName}.",
+    "Your {productCategory} doesn't have to cost a second mortgage. Check out {platformName}.",
+    ...
+  ],
+  lastGeneratedAt: "...",
+  performanceAdjustedAt: "..."
+}
+```
+
+### Category Evolution
+
+When VectorAS operates outside the contractor market:
+
+1. The system uses the environment profile to understand the audience
+2. GPT-4.1 generates **new humor categories** tailored to that audience (similar structure to the 10 locked categories — each with id, name, visual template, and directive)
+3. Generated categories are stored in `content_strategies` table and used for scenario generation
+4. Performance data feeds back — categories that perform well are reinforced, categories that flop are retired and replaced
+5. The 10 locked contractor categories remain available as the default/fallback and as the template for how categories should be structured
+
+### Tone Adaptation
+
+The AI adjusts its tone based on:
+- **Industry norms** — A law firm ad uses different humor than a construction company ad
+- **Platform expectations** — TikTok favors more casual/raw, LinkedIn favors professional wit
+- **Audience feedback** — If sarcastic tone underperforms for a specific audience, the AI shifts to self-deprecating or observational
+- **Product type** — Luxury products require subtler humor than budget products
+- **Performance data** — Continuous recalibration based on engagement metrics per tone style
+
+---
+
+## Database Schema
+
+All tables use UUID primary keys via `gen_random_uuid()` unless noted.
+
+### `users` (VectorAS accounts)
+```sql
+id              VARCHAR PK DEFAULT gen_random_uuid()
+username        VARCHAR UNIQUE NOT NULL
+email           VARCHAR UNIQUE
+emailVerified   BOOLEAN DEFAULT false
+password        VARCHAR NOT NULL (bcrypt hashed)
+phone           VARCHAR UNIQUE
+phoneVerified   BOOLEAN DEFAULT false
+displayName     VARCHAR
+profilePhoto    TEXT
+bio             TEXT
+city            VARCHAR
+state           VARCHAR
+latitude        REAL
+longitude       REAL
+isAdmin         BOOLEAN DEFAULT false
+isOwner         BOOLEAN DEFAULT false
+isBanned        BOOLEAN DEFAULT false
+banReason       TEXT
+createdAt       TIMESTAMP DEFAULT now()
+lastLoginAt     TIMESTAMP
+```
+
+### `studio_campaigns` (Copy Assistant campaigns)
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+userId              VARCHAR FK -> users.id NOT NULL
+listingId           VARCHAR (nullable — for marketplace integrations)
+name                TEXT NOT NULL
+description         TEXT
+campaignType        TEXT ('platform' | 'listing' | 'affiliate')
+primaryGoal         TEXT
+secondaryGoals      JSONB
+valueProposition    TEXT
+nonGoals            JSONB
+audienceDescription TEXT
+audienceSegments    JSONB
+languageStyle       TEXT
+trustDynamics       TEXT
+preferredTones      JSONB
+disallowedTones     JSONB
+visualNotes         TEXT
+voiceNotes          TEXT
+platformsTargeted   JSONB
+platformNotes       JSONB
+riskProfile         TEXT
+sensitiveTopics     JSONB
+priorFlags          JSONB
+adminWatch          BOOLEAN DEFAULT false
+status              TEXT DEFAULT 'draft'
+conversationPhase   TEXT DEFAULT 'intent_discovery'
+conversationHistory JSONB
+createdAt           TIMESTAMP DEFAULT now()
+updatedAt           TIMESTAMP DEFAULT now()
+```
+
+### `studio_videos` (Video pipeline records)
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+campaignId          VARCHAR FK -> studio_campaigns.id NOT NULL
+userId              VARCHAR FK -> users.id NOT NULL
+iterationNumber     INTEGER DEFAULT 1
+conceptSummary      TEXT
+hookType            TEXT
+hookRationale       TEXT
+tone                TEXT
+platform            TEXT
+aspectRatio         TEXT DEFAULT '9:16'
+targetDuration      INTEGER DEFAULT 30
+script              TEXT
+captions            JSONB
+onScreenText        JSONB
+keywords            JSONB
+seoNotes            TEXT
+visualPromptTexts   JSONB
+voiceId             TEXT
+voiceCharacteristics JSONB
+generatedVideoUrl   TEXT
+thumbnailUrl        TEXT
+violationClass      TEXT
+flaggedPhrases      JSONB
+warningsShown       JSONB
+reviewStatus        TEXT DEFAULT 'pending'
+approvalData        JSONB
+adminRequired       BOOLEAN DEFAULT false
+scheduledTime       TIMESTAMP
+postedTime          TIMESTAMP
+platformPostIds     JSONB
+regenerationCount   INTEGER DEFAULT 0
+userFeedback        TEXT
+aiAnalysis          TEXT
+listingDeepLink     TEXT
+status              TEXT DEFAULT 'concept'
+createdAt           TIMESTAMP DEFAULT now()
+updatedAt           TIMESTAMP DEFAULT now()
+```
+
+### `humor_performance` (serial PK — Comedy analytics)
+```sql
+id                      SERIAL PK
+adScriptId              TEXT
+humorCategory           TEXT NOT NULL
+title                   TEXT NOT NULL
+platform                TEXT NOT NULL ('youtube_shorts' | 'tiktok' | 'instagram_reels')
+platformVideoId         TEXT
+publishedAt             TIMESTAMP
+views                   INTEGER DEFAULT 0
+likes                   INTEGER DEFAULT 0
+comments                INTEGER DEFAULT 0
+shares                  INTEGER DEFAULT 0
+watchTimeSeconds        REAL DEFAULT 0
+avgWatchPercent         REAL DEFAULT 0
+engagementRate          REAL DEFAULT 0
+retentionScore          REAL DEFAULT 0
+totalDuration           REAL
+setupDuration           REAL
+punchlineTiming         REAL
+toneShiftCount          INTEGER
+deliveryPaceWps         REAL
+conceptTransitionSpeed  REAL
+escalationBeats         JSONB (number[])
+retentionCurve          JSONB ({t: number, pct: number}[])
+toneArc                 TEXT
+wordCount               INTEGER
+notes                   TEXT
+tags                    JSONB (string[])
+createdAt               TIMESTAMP DEFAULT now()
+updatedAt               TIMESTAMP DEFAULT now()
+```
+
+### `humor_benchmarks` (serial PK — Competitor tracking)
+```sql
+id              SERIAL PK
+creatorName     TEXT NOT NULL
+creatorHandle   TEXT
+platform        TEXT NOT NULL
+humorStyle      TEXT NOT NULL
+videoUrl        TEXT
+videoTitle      TEXT
+views           INTEGER DEFAULT 0
+likes           INTEGER DEFAULT 0
+comments        INTEGER DEFAULT 0
+engagementRate  REAL DEFAULT 0
+whatWorked      TEXT
+toneNotes       TEXT
+tags            JSONB (string[])
+scrapedAt       TIMESTAMP DEFAULT now()
+createdAt       TIMESTAMP DEFAULT now()
+```
+
+### `video_queue` (Video render queue)
+```sql
+id              VARCHAR PK DEFAULT gen_random_uuid()
+videoId         VARCHAR FK -> studio_videos.id NOT NULL
+userId          VARCHAR FK -> users.id NOT NULL
+status          VARCHAR(20) DEFAULT 'waiting'
+priority        INTEGER DEFAULT 0
+position        INTEGER
+startedAt       TIMESTAMP
+completedAt     TIMESTAMP
+errorMessage    TEXT
+createdAt       TIMESTAMP DEFAULT now()
+```
+
+### `performance_alerts` (System health alerts)
+```sql
+id              VARCHAR PK DEFAULT gen_random_uuid()
+alertType       VARCHAR(50) NOT NULL
+severity        VARCHAR(20) DEFAULT 'warning'
+message         TEXT NOT NULL
+metadata        JSONB
+acknowledged    BOOLEAN DEFAULT false
+acknowledgedBy  VARCHAR FK -> users.id
+createdAt       TIMESTAMP DEFAULT now()
+```
+
+### Supporting Tables
+
+**`studio_video_assets`** — Asset storage for videos (images, audio, generated files)
+```sql
+id          VARCHAR PK DEFAULT gen_random_uuid()
+videoId     VARCHAR FK -> studio_videos.id
+campaignId  VARCHAR FK -> studio_campaigns.id
+userId      VARCHAR FK -> users.id NOT NULL
+assetType   TEXT NOT NULL
+sourceType  TEXT NOT NULL
+url         TEXT
+description TEXT
+metadata    JSONB
+reusable    BOOLEAN DEFAULT false
+createdAt   TIMESTAMP DEFAULT now()
+```
+
+**`studio_creative_profiles`** — Per-user creative preferences
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+userId              VARCHAR FK -> users.id NOT NULL UNIQUE
+preferredStyles     JSONB
+platformStrengths   JSONB
+riskTolerance       TEXT DEFAULT 'moderate'
+commonAudiences     JSONB
+blindSpots          JSONB
+restrictionState    TEXT DEFAULT 'normal'
+totalVideosCreated  INTEGER DEFAULT 0
+totalVideosPosted   INTEGER DEFAULT 0
+createdAt           TIMESTAMP DEFAULT now()
+updatedAt           TIMESTAMP DEFAULT now()
+```
+
+**`studio_campaign_memory`** — Campaign learning data
+```sql
+id                          VARCHAR PK DEFAULT gen_random_uuid()
+campaignId                  VARCHAR FK -> studio_campaigns.id NOT NULL
+userId                      VARCHAR FK -> users.id NOT NULL
+successfulHooks             JSONB
+failedHooks                 JSONB
+tonePerformanceMap          JSONB
+visualStylePreferences      JSONB
+voicePreferences            JSONB
+platformPerformanceNotes    JSONB
+overridePatterns            JSONB
+adminInterventionHistory    JSONB
+updatedAt                   TIMESTAMP DEFAULT now()
+```
+
+**`api_keys`** — For external platform integration
+```sql
+id          VARCHAR PK DEFAULT gen_random_uuid()
+platformName VARCHAR NOT NULL
+apiKey      VARCHAR UNIQUE NOT NULL
+apiSecret   VARCHAR NOT NULL (hashed)
+permissions JSONB
+isActive    BOOLEAN DEFAULT true
+rateLimit   INTEGER DEFAULT 1000
+createdAt   TIMESTAMP DEFAULT now()
+lastUsedAt  TIMESTAMP
+```
+
+### `environment_profiles` (Host platform discovery data)
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+apiKeyId            VARCHAR FK -> api_keys.id
+platformName        VARCHAR NOT NULL
+platformUrl         TEXT
+platformType        VARCHAR (shopify, etsy, woocommerce, marketplace, custom_site, service_provider)
+industry            VARCHAR
+brandPersonality    TEXT
+toneProfile         JSONB ({primary, secondary, avoid[]})
+audienceProfile     JSONB ({primary, interests[], painPoints[], humorPreferences[]})
+discoveredProducts  JSONB (product inventory snapshot)
+suggestedAngles     JSONB (string[])
+crawlData           JSONB (raw crawl results)
+crawlFrequency      VARCHAR DEFAULT 'weekly'
+lastCrawledAt       TIMESTAMP
+nextCrawlAt         TIMESTAMP
+isActive            BOOLEAN DEFAULT true
+createdAt           TIMESTAMP DEFAULT now()
+updatedAt           TIMESTAMP DEFAULT now()
+```
+
+### `product_inventory` (Discovered products/services)
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+environmentId       VARCHAR FK -> environment_profiles.id NOT NULL
+externalId          TEXT (product ID from host platform)
+name                TEXT NOT NULL
+description         TEXT
+category            VARCHAR
+subcategory         VARCHAR
+price               REAL
+priceRange          VARCHAR
+imageUrl            TEXT
+pageUrl             TEXT
+aiTags              JSONB (string[] — AI-generated descriptive tags)
+aiCategory          VARCHAR (AI-classified product category)
+contentAngles       JSONB (string[] — suggested ad angles for this product)
+lastSeenAt          TIMESTAMP DEFAULT now()
+isActive            BOOLEAN DEFAULT true
+createdAt           TIMESTAMP DEFAULT now()
+```
+
+### `knowledge_entries` (Evolving AI knowledge base)
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+environmentId       VARCHAR FK -> environment_profiles.id (nullable — null for universal)
+source              VARCHAR NOT NULL (user_promoted, performance_data, web_research, cross_tenant, youtube_research)
+category            VARCHAR NOT NULL (humor_style, audience_preference, content_format, trend, competitor_insight, product_insight)
+title               TEXT NOT NULL
+content             TEXT NOT NULL
+confidence          REAL DEFAULT 0.5
+sources             JSONB (string[] — source references)
+tags                JSONB (string[])
+appliedCount        INTEGER DEFAULT 0
+lastAppliedAt       TIMESTAMP
+isPinned            BOOLEAN DEFAULT false
+expiresAt           TIMESTAMP (default: createdAt + 6 months)
+createdAt           TIMESTAMP DEFAULT now()
+updatedAt           TIMESTAMP DEFAULT now()
+```
+
+### `research_queries` (Research query tracking)
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+environmentId       VARCHAR FK -> environment_profiles.id (nullable)
+userId              VARCHAR FK -> users.id
+queryText           TEXT NOT NULL
+source              VARCHAR NOT NULL (auto_generated, user_promoted, scheduled)
+researchType        VARCHAR (youtube, web_search, platform_specific)
+resultsFound        INTEGER DEFAULT 0
+relevanceScore      REAL
+knowledgeEntriesCreated INTEGER DEFAULT 0
+status              VARCHAR DEFAULT 'pending' (pending, running, completed, failed)
+executedAt          TIMESTAMP
+createdAt           TIMESTAMP DEFAULT now()
+```
+
+### `content_strategies` (Per-environment content strategies)
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+environmentId       VARCHAR FK -> environment_profiles.id NOT NULL
+audienceSegments    JSONB (segment definitions with humor styles, tone ranges, formats)
+generatedCategories JSONB (custom humor categories for this environment)
+ctaTemplates        JSONB (string[] — CTA options for this environment)
+performanceNotes    JSONB (what's working, what's not)
+lastGeneratedAt     TIMESTAMP DEFAULT now()
+performanceAdjustedAt TIMESTAMP
+isActive            BOOLEAN DEFAULT true
+createdAt           TIMESTAMP DEFAULT now()
+updatedAt           TIMESTAMP DEFAULT now()
+```
+
+### `audience_insights` (Learned audience preferences)
+```sql
+id                  VARCHAR PK DEFAULT gen_random_uuid()
+environmentId       VARCHAR FK -> environment_profiles.id NOT NULL
+insightType         VARCHAR NOT NULL (humor_preference, content_format, platform_performance, timing, visual_style)
+insightData         JSONB NOT NULL
+confidence          REAL DEFAULT 0.5
+sampleSize          INTEGER DEFAULT 0
+source              VARCHAR (performance_data, research, user_feedback)
+createdAt           TIMESTAMP DEFAULT now()
+updatedAt           TIMESTAMP DEFAULT now()
+```
+
+---
+
+## Default Humor Categories (10 Contractor Categories — Locked for Blue-Collar Market)
+
+> These 10 categories are the default library for blue-collar contractor audiences. They are hardcoded and must not be modified. When VectorAS operates in adaptive mode for other industries, the Audience Intelligence Engine generates new categories tailored to the specific audience — see the Content Strategy section. The 10 categories below serve as the structural template for how all humor categories should be built (each with id, name, visual template, and directive).
+
+Every ad script falls into exactly one of these categories.
+
+### 1. `girlfriend_expensive` — "Girlfriend Is Expensive"
+- **Visual Template**: Driveway scene in front of garage. Evening lighting. Man leaning on truck or garage door. Wallet reaction visual.
+- **Directive**: The girlfriend wants something expensive. The contractor's wallet is screaming. Sarcastic, relatable money pressure humor. Setup: she drops a hint or makes a request. Reaction: his wallet (or bank account) physically recoils. Resolution: he signs a contract on Outpost Exchange instead of panicking.
+
+### 2. `wife_expensive` — "Wife Is Expensive"
+- **Visual Template**: Driveway scene in front of garage. Evening lighting. Man leaning on truck or garage door. Wallet reaction visual.
+- **Directive**: Same energy as Girlfriend Is Expensive but with married-life specifics — the 'honey do' list meets financial reality. She mentions a renovation, a vacation, or new furniture. His wallet flatlines. He opens Outpost Exchange and lands a contract.
+
+### 3. `kids_expensive` — "Kids Are Expensive"
+- **Visual Template**: Kitchen table or garage with kid making a request. Subtle chaos tone.
+- **Directive**: Kids need something expensive — braces, sports equipment, college fund, new shoes (again). The contractor does mental math, realizes he needs another contract. Deadpan kid delivery vs. panicked dad reaction.
+
+### 4. `walletus_maximus` — "Walletus Maximus"
+- **Visual Template**: Gym lighting parody. Serious close-up framing. Overly dramatic slow zoom.
+- **Directive**: Parody of fitness supplement ads but for a contractor's wallet. Treat the wallet like it's a muscle that needs to be trained, fed, and protected. Overly dramatic framing of a thin wallet. Clinical seriousness about 'wallet health.' The cure: signing contracts on Outpost Exchange.
+
+### 5. `bluechew_wallet` — "BlueChew Wallet"
+- **Visual Template**: Pharmacy desk parody. Lower-third disclaimer bar: 'Consult your contractor.' Clinical lighting.
+- **Directive**: Pharmaceutical ad parody for a 'limp wallet.' Clinical tone, side effects listed, dramatic improvement after treatment (treatment = landing contracts on Outpost Exchange). Must include a parody disclaimer. Deadpan medical seriousness about financial performance issues.
+
+### 6. `buddy_got_raise` — "Buddy Got a Raise"
+- **Visual Template**: Jobsite setting. High-vis vest. Ego posture shift.
+- **Directive**: A buddy on the jobsite casually mentions he got a raise, landed a big contract, or bought something nice. The protagonist's ego takes a hit. Competitive energy. He immediately opens Outpost Exchange to level up. Masculine one-upmanship humor.
+
+### 7. `broke_boys` — "Broke Boys"
+- **Visual Template**: Jobsite break area. Group laughing. One guy checking empty wallet.
+- **Directive**: Group of contractors roasting the one broke guy. Break room or tailgate energy. The broke one is checking his empty wallet while others flex. The joke is on him until he starts landing contracts on Outpost Exchange. Pack humor — the group dynamic is the comedy engine.
+
+### 8. `bar_stool_economics` — "Bar Stool Economics"
+- **Visual Template**: Dim bar. Slumped over stool. Bartender wiping counter.
+- **Directive**: Contractor at a bar, drowning his sorrows about money. Bartender is the straight man. Include 'Momma didn't raise no quitter' energy — he picks himself up and signs up on Outpost Exchange. Bar wisdom meets financial desperation. Dark humor with a redemption beat.
+
+### 9. `chrome_addiction` — "Chrome Addiction"
+- **Visual Template**: Driveway with truck. Focus on rims / lift kit. Comparison framing.
+- **Directive**: Contractor spent money on truck accessories (rims, lift kit, light bar) instead of saving. Now he's broke but his truck looks incredible. The vanity vs. reality tension. He needs contracts to fund the chrome habit. Outpost Exchange is the enabler he deserves.
+
+### 10. `cubicle_vs_contractor` — "Cubicle vs Contractor"
+- **Visual Template**: Grey office cubicle parody or Starbucks parody setup. Hard contrast vs jobsite scene.
+- **Directive**: Direct contrast between a cubicle worker complaining about minor inconveniences (bad coffee, slow wifi, Karen from accounting) and a contractor dealing with REAL problems. The cubicle guy's worst day is the contractor's Tuesday. But the contractor signs contracts on Outpost Exchange and makes more money. Who's laughing now.
+
+---
+
+## Comparison Irritants (8 Before/After Templates)
+
+These are before/after "pain vs. solution" ad templates. Each has two panels — one showing an absurdly exaggerated version of a real contractor problem, and one showing the same situation resolved through the platform.
+
+### 1. `comp_scope_creep` — "Drawing Up a Contract"
+- **Pain Panel**: Contractor sitting at a kitchen table at 2 AM with a legal pad, three crushed energy drink cans, and a YouTube tab open titled 'How to Write a Contract Without a Lawyer.' His handwriting is illegible. The homeowner's dog is chewing on page two.
+- **Solution Panel**: Contractor tapping 'Create Contract' on his phone from a hammock. The Outpost Exchange AI assistant has already drafted scope, materials, timeline, and payment schedule. He sips lemonade. A notification says 'Customer signed.'
+- **Pain Caption**: DRAWING UP A CONTRACT
+- **Solution Caption**: DRAWING UP A CONTRACT WITH OUTPOST EXCHANGE
+- **CTA**: Your contract shouldn't require a law degree and a therapy session.
+
+### 2. `comp_scope_creep_actual` — "Scope Creep"
+- **Pain Panel**: Contractor buried up to his neck in a literal pile of Post-it notes, each one with a new 'while you're here' request. The original bathroom quote is taped to the wall at $200. A running counter above his head shows hours worked: 847. The homeowner is casually pointing at the roof saying 'one more thing.'
+- **Solution Panel**: Contractor reviewing a clean change order on his tablet. Each addition is itemized with price, timeline adjustment, and customer approval checkbox. A notification reads 'Change Order #3 signed — $1,200 added.' He's smiling. His bank account is also smiling.
+- **Pain Caption**: SCOPE CREEP
+- **Solution Caption**: SCOPE CREEP WITH OUTPOST EXCHANGE
+- **CTA**: Change orders exist for a reason. Every 'while you're here' has a price tag now.
+
+### 3. `comp_getting_paid` — "Getting Paid"
+- **Pain Panel**: Contractor standing on a finished deck he just built, holding an invoice like a ransom note. The homeowner is visible through the window hosting a barbecue on the deck. Contractor's phone shows 47 unanswered texts. A tumbleweed rolls by. Calendar on the wall shows 6 months have passed.
+- **Solution Panel**: Contractor's phone buzzes with 'Milestone payment confirmed.' He's fishing on a lake, feet up, wearing sunglasses. His truck in the background has a bumper sticker that says 'I GET PAID ON TIME.' The fish are biting.
+- **Pain Caption**: GETTING PAID
+- **Solution Caption**: GETTING PAID WITH OUTPOST EXCHANGE
+- **CTA**: Your kitchen shouldn't be someone else's dinner party until you've been paid for it.
+
+### 4. `comp_finding_leads` — "Finding Real Leads"
+- **Pain Panel**: Contractor surrounded by phones, all ringing simultaneously. One caller is a wrong number. One is a grandma asking about her prescription. One is a robot voice selling extended car warranties. Money is literally flying out of his wallet — each lead costs $47. His desk is covered in bills from lead platforms. A cat walked across his keyboard and accidentally bought 12 more leads.
+- **Solution Panel**: Contractor's phone shows one notification: 'New project request — Kitchen remodel, 3 miles away, budget $15K-$25K, homeowner verified.' He's eating a sandwich. His wallet is full. Birds are singing.
+- **Pain Caption**: FINDING REAL LEADS
+- **Solution Caption**: FINDING REAL LEADS WITH OUTPOST EXCHANGE
+- **CTA**: Zero lead fees. Because talking to grandma about her prescription isn't a business model.
+
+### 5. `comp_knowing_track_record` — "Knowing Your Customer's Track Record"
+- **Pain Panel**: Contractor shaking hands with a smiling homeowner whose shadow on the wall shows a devil with horns and a pitchfork. Behind the homeowner, a trail of destruction — three unfinished projects, two crying contractors, and a small claims court filing blowing in the wind. A Yelp review floats by that says '5 stars, great customer!' written by the homeowner's mother.
+- **Solution Panel**: Contractor reviewing the homeowner's Outpost Exchange profile: '4 contracts completed, 0 disputes, 0 failed.' A green checkmark glows. The contractor is nodding confidently. His gut feeling and the data agree for once in his career.
+- **Pain Caption**: KNOWING YOUR CUSTOMER'S TRACK RECORD
+- **Solution Caption**: KNOWING YOUR CUSTOMER'S TRACK RECORD WITH OUTPOST EXCHANGE
+- **CTA**: Contract history can't be faked. Unlike Yelp reviews from someone's mom.
+
+### 6. `comp_starting_business` — "Starting a Contracting Business"
+- **Pain Panel**: Fresh contractor tied to a chair in a dark room. Platform subscription invoices are taped to the wall like ransom photos. Each platform logo has a dollar amount: $49/mo, $79/mo, $149/mo, $299 onboarding fee. He hasn't landed a single job. His license is framed on the wall behind him, mocking him. A light bulb swings overhead.
+- **Solution Panel**: Same contractor getting a massage on a tropical beach, checking his phone. A notification says 'New project request from verified homeowner.' His listing is live, his profile is verified, and his bank account still has money in it. A waiter brings him an umbrella drink. His license is framed on the beach umbrella.
+- **Pain Caption**: STARTING A CONTRACTING BUSINESS
+- **Solution Caption**: STARTING A CONTRACTING BUSINESS WITH OUTPOST EXCHANGE
+- **CTA**: Free until you earn. Because paying to work is the business model of a scam, not a platform.
+
+### 7. `comp_ghost_sub` — "Hiring a Subcontractor"
+- **Pain Panel**: GC staring at a half-demolished bathroom, phone to his ear, getting voicemail for the 11th time. The sub's last text — a thumbs-up emoji sent 9 days ago — glows on screen. The homeowner is peering through the doorway with murder in her eyes. The sub's Facebook shows him fishing in another state, posted 2 hours ago. A cobweb has formed on the drywall.
+- **Solution Panel**: GC reviewing a sub's Outpost Exchange profile: '12 contracts completed, 1 disputed (resolved), average completion 3 days early.' The sub shows up on time with tools. They fist bump. The homeowner is inside baking cookies because she's not stressed for the first time in her life.
+- **Pain Caption**: HIRING A SUBCONTRACTOR
+- **Solution Caption**: HIRING A SUBCONTRACTOR WITH OUTPOST EXCHANGE
+- **CTA**: Thumbs-up emojis aren't a work ethic. Verified completion records are.
+
+### 8. `comp_change_orders` — "Handling Mid-Project Changes"
+- **Pain Panel**: Contractor and homeowner in an awkward standoff in a half-tiled bathroom. The homeowner is pointing at the floor saying 'heated floors would be nice.' The contractor is doing mental math on his fingers, sweat dripping. A thought bubble shows him calculating whether he can afford to say no. The original contract — written on a napkin — is getting wet from a leaking pipe.
+- **Solution Panel**: Contractor tapping 'Submit Change Order' on his phone. The screen shows: 'Heated floors — $2,400, timeline +2 days, customer approval required.' The homeowner's phone buzzes. She signs. The contractor's phone buzzes: 'Change Order #1 approved.' Everyone is calm. The pipe isn't leaking because someone competent is handling this.
+- **Pain Caption**: HANDLING MID-PROJECT CHANGES
+- **Solution Caption**: HANDLING MID-PROJECT CHANGES WITH OUTPOST EXCHANGE
+- **CTA**: Change orders: because 'heated floors would be nice' should come with a price tag, not a panic attack.
+
+---
+
+## Video Production Pipeline (Ad Engine)
+
+The ad engine produces short-form (8-15 second) video ads through a multi-step pipeline.
+
+### Step 1: Scenario Generation
+- `GET /api/ad-engine/scenarios` — Generates 6 AI-powered humor scenarios
+- Randomly selects 6 of the 10 locked humor categories
+- Feeds existing performance data (top 15 ads by engagement) and competitor benchmarks (top 10) into the AI prompt
+- AI generates scenario concepts with intelligence metadata: `intelligenceSource` (performance_data, benchmark_data, pattern_generated), `confidenceScore` (0-100), and `sourceMetrics` (engagement rate, duration, pacing, tone arc from source data)
+- Each scenario includes: id, title, description, category, tags, arc (hook, escalation, exaggeration, resolution, brandClose), suggestedCharacters
+- Falls back to static `scenarios.json` file if AI generation fails
+
+### Step 2: Script Generation
+- `POST /api/ad-engine/scripts/generate` — Creates a 3-scene script from a scenario
+- **3-Scene Structure**:
+  1. **PRESSURE SETUP** (2-4 seconds) — A financial pressure moment
+  2. **EGO/WALLET REACTION** (2-4 seconds) — The visceral reaction
+  3. **CONTRACT SIGNED** (3-5 seconds) — He signs a contract on the platform
+- Each scene has: sceneNumber, duration, narration, visualDescription, textOverlay, character, mood
+- Brand close includes locked CTA narration, text overlay, and tagline
+- Format: `landscape` (1536x1024) or `portrait` (1024x1536)
+- Model: GPT-4.1
+
+### Step 3: Script Editing
+- `PUT /api/ad-engine/scripts/:scriptId` — Direct field updates (scenes, title, brandClose, format, totalDuration)
+- `POST /api/ad-engine/scripts/:scriptId/chat` — AI-powered script modification via chat
+  - Send a message describing desired changes
+  - AI modifies the script using GPT-4.1 and returns the updated version
+  - Preserves script structure while applying creative changes
+- `POST /api/ad-engine/scripts/:scriptId/regenerate` — Full regeneration from same scenario
+
+### Step 4: Voiceover Generation
+- `POST /api/ad-engine/scripts/:scriptId/voiceover` — Generate narration audio
+- Uses OpenAI TTS-1 model with "onyx" voice (deep bass male, masculine delivery)
+- Concatenates all scene narrations plus brand close narration
+- Saves as MP3 in `temp_ad_assets/` directory
+- Returns authenticated URL and public URL with HMAC token
+- `POST /api/ad-engine/scripts/:scriptId/voiceover/regenerate` — Delete existing and regenerate
+
+### Step 5: Scene Image Generation
+- `POST /api/ad-engine/scripts/:scriptId/scenes/:sceneNumber/image` — Generate scene image
+- Uses GPT-Image-1 (via direct OpenAI API, not proxy) for photorealistic generation
+- Image prompt enhancement: "Industrial grey palette, dark steel tones, muted masculine setting, cinematic composition" prepended to visual description
+- Size based on format: landscape = `1536x1024`, portrait = `1024x1536`
+- Saves as PNG in `temp_ad_assets/` directory
+- Returns authenticated URL and public URL with HMAC token
+- `POST /api/ad-engine/scripts/:scriptId/scenes/:sceneNumber/image/regenerate` — Delete existing and regenerate
+
+### Step 6: Video Assembly
+- `POST /api/ad-engine/scripts/:scriptId/render` — Assemble final video
+- **FFmpeg Pipeline**:
+  1. For each scene, create a video segment from the static image:
+     - `zoompan` filter for Ken Burns effect (alternating zoom-in/zoom-out per scene)
+     - Text overlay strip at 78% height with scene narration text
+     - Dark steel border frame overlay (`0x1C1F24` color with 0.6-0.7 opacity)
+     - Monospace font, fade-in text animation
+  2. Crossfade transitions between scenes (0.4 second `xfade=transition=fade`)
+  3. Audio mixing: overlay voiceover MP3 onto assembled video (`-c:a aac -b:a 128k -shortest`)
+  4. Thumbnail extraction: frame at 1 second (`-ss 1 -vframes 1`)
+- Output: MP4 in `generated_ads/` directory
+- Cleanup: temp files for this script removed from `temp_ad_assets/`
+
+### Step 7: YouTube Upload
+- `POST /api/ad-engine/scripts/:scriptId/youtube-metadata` — AI-generated metadata
+  - GPT-4.1-nano generates SEO-friendly title, description with platform link, and 4-6 tags
+  - Includes full platform context (contract-gated, free listing, 2.5% fee, etc.)
+- `POST /api/ad-engine/scripts/:scriptId/youtube` — Upload to YouTube
+  - OAuth2 refresh token flow: stored in `platform_settings` table (user_youtube_client_id, user_youtube_client_secret, user_youtube_refresh_token)
+  - Refreshes access token before each upload
+  - Supports privacy status: public, unlisted (default), private
+
+### One-Click Pipeline
+- `POST /api/ad-engine/pipeline` — Synchronous full pipeline
+  - Accepts: scenarioId or inline scenario, format, customNotes
+  - Runs: scenario selection -> script generation -> voiceover -> all scene images -> video render
+  - Returns complete result with all URLs
+  - Cleans up temp files on completion
+
+### Async Pipeline
+- `POST /api/ad-engine/pipeline/async` — Returns jobId immediately
+  - Same inputs as synchronous pipeline
+  - Runs pipeline in background
+  - Job tracks: status (queued, running, completed, failed), currentStep, progress percentage, step details
+- `GET /api/ad-engine/pipeline/jobs` — List all jobs for authenticated user
+- `GET /api/ad-engine/pipeline/jobs/:jobId` — Get specific job status and result
+
+### Generate All Assets
+- `POST /api/ad-engine/scripts/:scriptId/generate-all` — Generate voiceover + all scene images + render in one call
+
+---
+
+## Comparison Ad Pipeline
+
+The comparison pipeline produces before/after "pain vs. solution" ads using the 8 comparison irritant templates.
+
+### Flow
+1. `GET /api/ad-engine/comparison-scenarios` — Generate 6 comparison scenarios (randomly selected from 8 templates)
+   - AI enhances the base irritant templates with additional creative detail
+   - Returns enriched pain/solution panels with visual descriptions
+2. `POST /api/ad-engine/scripts/generate-comparison` — Generate comparison script
+   - Two-panel structure: pain scene + solution scene + CTA
+   - Pain panel uses darker industrial grey, more chaotic composition
+   - Solution panel uses cleaner, more confident industrial look
+   - Same locked CTA appended
+3. Same voiceover, image, render, and upload flow as standard pipeline
+
+---
+
+## Generic Video Pipeline
+
+A separate pipeline used by the Copy Assistant for campaign-based video production. This is distinct from the Ad Engine pipeline.
+
+### Flow
+1. **Scene Breakdown** — GPT-4.1-nano creates 3-scene structure:
+   - Scene 1: HOOK — Attention-grabbing visual with bold provocative headline (max 6 words, ALL CAPS)
+   - Scene 2: VALUE — Product/service showcase with benefit statement (max 6 words, ALL CAPS)
+   - Scene 3: CTA — Call-to-action with branding (max 6 words, ALL CAPS)
+   - Each scene: 5 seconds, totaling 15 seconds
+2. **Scene Images** — GPT-Image-1 generates photorealistic images
+   - Enhanced prompt: "Cinematic commercial photography, dramatic lighting, shallow depth of field"
+   - Size: 1792x1024 (landscape/16:9) or 1024x1792 (portrait/9:16)
+   - Fallback to FFmpeg-generated placeholder on failure
+3. **Voiceover** — OpenAI TTS-1 with selectable voice (default: "alloy")
+   - Narration text assembled from onScreenText + subText of each scene
+   - Optional — pipeline continues without audio if generation fails
+4. **Video Assembly** — FFmpeg with same effects as ad engine:
+   - Zoompan Ken Burns effect (alternating zoom-in/zoom-out)
+   - Gradient overlay bars (top 25% and bottom 30% with dark green tint at 0.6-0.7 opacity)
+   - Main text overlay with fade-in animation at 75% height
+   - Sub-text overlay below main text
+   - Crossfade transitions (0.5 second)
+   - Audio mixing if voiceover available
+5. **Thumbnail** — Extracted from video at 1 second mark
+6. **Cleanup** — Temp files removed per-video after assembly
+
+### Video Queue System
+- **MAX_CONCURRENT**: 10 simultaneous renders
+- **QUEUE_CHECK_INTERVAL**: 5 seconds
+- **Estimated Wait**: `position * 45` seconds
+- **Stale Job Cleanup**: 10-minute timeout — jobs stuck in "processing" for 10+ minutes are marked failed
+- **Queue Statuses**: `waiting`, `processing`, `completed`, `failed`, `cancelled`
+- **Cancel Support**: Only items in `waiting` status can be cancelled
+- **Position Tracking**: Each user can see their position in the queue
+
+### Performance Alert Thresholds
+- Queue depth >= 25: `warning` severity alert ("Video queue depth high")
+- Wait time > 5 minutes: `warning` severity alert ("Video queue wait time exceeding threshold")
+- Alerts stored in `performance_alerts` table
+- Acknowledgeable by admin users
+
+---
+
+## Copy Assistant
+
+The AI copywriting subsystem helps users create marketing content through a conversation-driven workflow.
+
+### Campaign Types
+- **Platform** (admin/owner only) — Promotional copy for the marketplace itself
+- **Listing** (all users with studio access) — Copy for specific service or equipment listings
+- **Affiliate** — Promotional copy with referral links
+
+### Access Control
+Studio access requires one of:
+- Owner or admin role
+- Active membership subscription
+- Active affiliate status
+
+### Conversation Workflow
+The AI guides users through internal phases (never exposed to the user):
+
+1. **intent_discovery** — What they want to promote and why
+   - Extracts: productType, promotionReason, keyFeatures
+2. **audience_analysis** — Who they're trying to reach
+   - Extracts: targetAudience, audiencePainPoints, audienceInterests
+3. **value_proposition** — What makes it compelling
+   - Extracts: uniqueValue, differentiator, whyCare
+4. **hook_generation** — Opening hooks and attention-grabbers
+   - Extracts: hooks (array of {type, text, rationale})
+5. **tone_selection** — Voice and feel of the copy
+   - Extracts: selectedTone, toneRationale
+6. **platform_optimization** — Which platform (listing description, Facebook, Instagram, X, etc.)
+   - Extracts: platform, platformNotes, copyFormat
+7. **concept_summary** — Final draft presentation
+   - Extracts: conceptSummary, copyDraft, readyToFinalize
+
+### Platform Knowledge Base
+- Loaded from `system_knowledge/outpost_exchange_canonical_model.json` at startup
+- Injects full platform facts: fee model, reputation system, contract lifecycle, categories, privacy model
+- Content modes supported (configurable tone/emphasis per mode)
+- All AI outputs constrained to factual platform capabilities
+
+### Prohibited Request Detection
+- Pattern matching on user messages to block:
+  - Dispute decisions, fault assignment
+  - Legal/financial/medical advice
+  - Price setting, product guarantees
+  - User certification
+- Tracks repeated attempts per user (escalates at 3+ attempts with console warning and event logging)
+
+### Creative Profile Management
+- `GET /api/studio/profile` — Get user's creative profile
+- `POST /api/studio/profile/reset` — Reset creative profile to defaults
+- Tracks: preferred styles, platform strengths, risk tolerance, common audiences, blind spots, restriction state, total videos created/posted
+
+---
+
+## Humor Screener (Analytics Engine)
+
+The Humor Screener is VectorAS's comedy analytics subsystem. It tracks ad performance with deep structural anatomy metrics and provides AI-powered insights.
+
+### Performance Tracking
+Record and query ad performance data with full structural anatomy:
+
+- **Engagement Metrics**: views, likes, comments, shares, watch time, average watch percent, engagement rate, retention score
+- **Structural Anatomy**:
+  - `setupDuration` — How long the setup takes (seconds)
+  - `punchlineTiming` — When the punchline lands (seconds)
+  - `deliveryPaceWps` — Words per second delivery rate
+  - `toneShiftCount` — Number of tone changes in the ad
+  - `conceptTransitionSpeed` — How fast concepts change (seconds)
+  - `escalationBeats` — Array of timestamps where comedy escalates (number[])
+  - `retentionCurve` — Viewer retention at timestamps ({t: seconds, pct: percentage}[])
+  - `toneArc` — Description of tone progression (e.g., "deadpan -> absurd -> flat")
+  - `wordCount` — Total words in the script
+- **Valid Platforms**: youtube_shorts, tiktok, instagram_reels
+- **Engagement Rate Calculation**: `((likes + comments + shares) / views) * 100`
+
+### Competitor Benchmarking
+Track competitor creators and their content:
+- Creator identification (name, handle)
+- Platform and humor style classification
+- Video URL and title reference
+- Engagement metrics (views, likes, comments, engagement rate)
+- Qualitative notes: whatWorked, toneNotes
+- Tags for categorization
+- Filter by creator name (fuzzy search), humor style, platform
+
+### AI-Powered Analytics Dashboard
+`GET /api/humor-screener/analytics` returns comprehensive analytics:
+
+1. **Category Rankings** — All humor categories ranked by average engagement rate
+   - Includes: avg engagement, total videos, total views, total likes
+   - When anatomy data available: avg setup duration, avg punchline timing, avg delivery pace, avg tone shifts, avg concept transitions
+2. **Top Performers** — Top 10 ads by engagement rate
+3. **Platform Breakdown** — Per-platform stats (youtube_shorts, tiktok, instagram_reels)
+   - Total videos, total views, average engagement rate
+4. **Pattern Insights** — Data-driven structural analysis
+   - Compares top quartile vs bottom quartile performers within each category
+   - Identifies which structural metrics correlate with higher engagement
+   - Example: "In Girlfriend Is Expensive, top performers have avg setup of 1.8s vs 3.2s for bottom — faster setups win"
+5. **Retention Analysis** — Aggregate retention curve analysis
+   - Average retention at common timestamps (2, 4, 6, 8, 10, 12, 14 seconds)
+   - Critical drop-off point (where average retention falls below 50%)
+   - Per-category retention curves
+6. **AI Suggestions** — GPT-4.1 generates 5 actionable suggestions
+   - References exact categories, creators, engagement numbers, structural patterns
+   - Sarcastic tone, no fluff
+
+### AI Concept Suggestions
+`POST /api/humor-screener/suggest` generates new video concepts with structural blueprints:
+
+- Accepts: `count` (1-10, default 3)
+- Returns array of concepts, each with:
+  - title, humorCategory, pitch, targetPlatform, expectedEngagement, inspiredBy
+  - **Blueprint**: totalDuration, beatTiming (exact second breakpoints), deliveryPace (wps), toneArc, retentionStrategy
+- AI references performance data, anatomy patterns, and competitor benchmarks
+- Example blueprint: `{ totalDuration: 12, beatTiming: "Setup: 0-2s, Hit: 2.5s, Escalation: 5s, Punchline: 8s, CTA: 10-12s", deliveryPace: 2.8, toneArc: "deadpan -> absurd -> flat", retentionStrategy: "Fast visual hook in first 2s, tone shift at 5s to re-engage" }`
+
+---
+
+## YouTube Research
+
+> **Note:** The YouTube Research system operates in two modes. In **standalone/default mode**, it uses the 12 hardcoded contractor humor queries listed below. In **adaptive mode** (when an environment profile exists), it generates dynamic queries based on discovered products, audience, and industry — see the Adaptive Research Engine section above. The hardcoded queries serve as the fallback and as the default for contractor-market deployments.
+
+The YouTube Research subsystem scans YouTube for competitor content and imports it as benchmarks.
+
+### Default Search Queries (12 terms)
+```
+contractor humor shorts
+blue collar comedy tiktok
+trades worker funny
+plumber electrician jokes
+girlfriend expensive meme
+wife spending money humor
+broke boys comedy shorts
+bar stool economics funny
+construction worker comedy
+handyman humor
+DIY fail comedy shorts
+contractor vs homeowner funny
+```
+
+### Scan Pipeline (`POST /api/youtube-research/scan`)
+1. Accepts optional custom queries array and maxPerQuery (default 10, max 50)
+2. Falls back to 12 default queries if none provided
+3. For each query:
+   - `youtube.search.list` — Search for short videos, ordered by viewCount (100 quota units)
+   - `youtube.videos.list` — Fetch snippet, contentDetails, statistics for results (1 quota unit)
+4. For each video result:
+   - Check for existing benchmark by URL (skip duplicates)
+   - Auto-infer humor style from query terms (relationship_spending, financial_humor, contractor_comedy, trades_humor, diy_fails, blue_collar_comedy, contractor_vs_client, general_humor)
+   - Insert into `humor_benchmarks` table with engagement rate calculated
+5. Returns: scanned count, added count, skipped count, quota used, detailed results
+
+### Batch Analysis (`POST /api/youtube-research/analyze-batch`)
+- Accepts array of video IDs or URLs (max 50)
+- Extracts video ID from various URL formats (watch, shorts, youtu.be)
+- Fetches video details via YouTube Data API
+- **Optional AI Humor Analysis** (`analyzeHumor: true`):
+  - GPT-4.1 analyzes each video for humor mechanics
+  - Categorizes humor type, setup timing, punchline structure
+  - Rates as benchmark for contractor/trades humor
+- Returns detailed video data with optional AI analysis
+
+### Quota Tracking
+- Session-level quota counter incremented per API call
+- search.list = 100 units per call
+- videos.list = 1 unit per call
+- `GET /api/youtube-research/status` returns: apiKeyConfigured, lastScanAt, totalBenchmarks, quotaUsedThisSession
+
+---
+
+## Complete API Route Specification
+
+### Ad Engine Routes (26 routes — all require auth + owner/admin)
+```
+GET    /api/ad-engine/scenarios                                    — Generate 6 AI-powered humor scenarios (data-driven)
+GET    /api/ad-engine/comparison-scenarios                         — Generate 6 comparison scenarios from 8 templates
+GET    /api/ad-engine/characters                                   — Load character definitions from characters.json
+POST   /api/ad-engine/scripts/generate                             — Generate script from scenario (3-scene structure)
+POST   /api/ad-engine/scripts/generate-comparison                  — Generate comparison script (pain/solution panels)
+POST   /api/ad-engine/scripts/:scriptId/regenerate                 — Regenerate script from same scenario
+PUT    /api/ad-engine/scripts/:scriptId                            — Update script fields (scenes, title, brandClose, format)
+POST   /api/ad-engine/scripts/:scriptId/voiceover                  — Generate voiceover (TTS-1, onyx voice)
+POST   /api/ad-engine/scripts/:scriptId/voiceover/regenerate       — Delete and regenerate voiceover
+GET    /api/ad-engine/audio/:scriptId                              — Serve voiceover audio (authenticated)
+GET    /api/ad-engine/audio/:scriptId/public                       — Serve voiceover audio (HMAC token)
+POST   /api/ad-engine/scripts/:scriptId/scenes/:sceneNumber/image  — Generate scene image (GPT-Image-1)
+POST   /api/ad-engine/scripts/:scriptId/scenes/:sceneNumber/image/regenerate — Regenerate scene image
+GET    /api/ad-engine/images/:scriptId/:sceneNumber                — Serve scene image (authenticated)
+GET    /api/ad-engine/images/:scriptId/:sceneNumber/public         — Serve scene image (HMAC token)
+POST   /api/ad-engine/scripts/:scriptId/render                     — Render final video (FFmpeg assembly)
+GET    /api/ad-engine/video/:scriptId/stream                       — Stream rendered video (range request support)
+GET    /api/ad-engine/video/:scriptId/download                     — Download rendered video (attachment disposition)
+POST   /api/ad-engine/scripts/:scriptId/youtube-metadata           — Generate YouTube metadata via AI
+POST   /api/ad-engine/scripts/:scriptId/youtube                    — Upload to YouTube (OAuth2 refresh flow)
+POST   /api/ad-engine/scripts/:scriptId/chat                       — AI chat script modification (GPT-4.1)
+POST   /api/ad-engine/scripts/:scriptId/generate-all               — Generate all assets (voiceover + images + render)
+POST   /api/ad-engine/pipeline                                     — One-click synchronous full pipeline
+POST   /api/ad-engine/pipeline/async                               — Async pipeline (returns jobId for polling)
+GET    /api/ad-engine/pipeline/jobs                                — List user's pipeline jobs
+GET    /api/ad-engine/pipeline/jobs/:jobId                         — Get specific job status and result
+```
+
+### Humor Screener Routes (6 routes — all require auth + owner/admin)
+```
+POST   /api/humor-screener/performance   — Record ad performance data with structural anatomy
+GET    /api/humor-screener/performance   — List performance records (filter: category, platform; sort: views, likes, engagement_rate)
+POST   /api/humor-screener/benchmarks    — Add competitor benchmark manually
+GET    /api/humor-screener/benchmarks    — List benchmarks (filter: creator, style, platform)
+GET    /api/humor-screener/analytics     — Full analytics dashboard (category rankings, top performers, platform breakdown, pattern insights, retention analysis, AI suggestions)
+POST   /api/humor-screener/suggest       — AI-powered concept suggestions with structural blueprints
+```
+
+### YouTube Research Routes (3 routes — all require auth + owner/admin)
+```
+POST   /api/youtube-research/scan          — Scan YouTube for competitor content (12 default queries or custom)
+POST   /api/youtube-research/analyze-batch — Analyze batch of video IDs with optional AI humor analysis
+GET    /api/youtube-research/status        — Research status (API key status, last scan, total benchmarks, quota)
+```
+
+### Copy Assistant Routes (9 routes — require auth + studio access)
+```
+POST   /api/studio/campaigns                     — Create campaign (name, campaignType, listingId)
+GET    /api/studio/campaigns                      — List user's campaigns
+GET    /api/studio/campaigns/:id                  — Get campaign details
+PUT    /api/studio/campaigns/:id                  — Update campaign fields
+DELETE /api/studio/campaigns/:id                  — Delete campaign
+POST   /api/studio/campaigns/:campaignId/chat     — AI conversation (phase-driven copywriting workflow)
+GET    /api/studio/profile                        — Get creative profile
+POST   /api/studio/profile/reset                  — Reset creative profile to defaults
+GET    /api/studio/dashboard                      — Dashboard stats (total campaigns)
+```
+
+### Environment Discovery Routes (8 routes — require auth)
+```
+POST   /api/environment/discover              — Initiate platform discovery (provide URL or let crawler detect from embed context)
+GET    /api/environment/profiles               — List all environment profiles for this user/API key
+GET    /api/environment/profiles/:id           — Get specific environment profile with discovered products
+PUT    /api/environment/profiles/:id           — Update environment profile (manual overrides)
+POST   /api/environment/profiles/:id/refresh   — Trigger re-crawl of host platform
+GET    /api/environment/profiles/:id/products  — List discovered products for an environment
+POST   /api/environment/profiles/:id/products  — Manually add products to environment
+DELETE /api/environment/profiles/:id/products/:productId — Remove product from inventory
+```
+
+### Knowledge Base Routes (7 routes — require auth)
+```
+POST   /api/knowledge/research          — Execute a user-promoted research query
+GET    /api/knowledge/entries            — List knowledge entries (filter by environment, category, source)
+GET    /api/knowledge/entries/:id        — Get specific knowledge entry
+PUT    /api/knowledge/entries/:id/pin    — Pin a knowledge entry (prevent decay)
+DELETE /api/knowledge/entries/:id        — Delete a knowledge entry
+GET    /api/knowledge/queries            — List research query history
+GET    /api/knowledge/insights           — AI-generated insights summary from accumulated knowledge
+```
+
+### Content Strategy Routes (5 routes — require auth)
+```
+POST   /api/strategy/generate            — Generate content strategy for an environment
+GET    /api/strategy/:environmentId       — Get current content strategy
+PUT    /api/strategy/:environmentId       — Update content strategy (manual adjustments)
+POST   /api/strategy/:environmentId/calibrate — Recalibrate strategy based on latest performance data
+GET    /api/strategy/:environmentId/categories — Get generated humor categories for this environment
+```
+
+**Total: 64 routes** across 7 subsystems
+
+---
+
+## Asset Token Security
+
+VectorAS uses HMAC-based tokens for public access to generated assets (images and audio) without requiring authentication. This enables embedding in external pages and widgets.
+
+### Token Generation
+```
+expiry = Date.now() + 3600000  (1-hour TTL)
+hmac = HMAC-SHA256(SESSION_SECRET, "${scriptId}:${expiry}")
+token = "${expiry}-${hmac}"
+```
+
+### Token Verification
+1. Split token at first `-` to extract expiry and HMAC
+2. Check expiry has not passed
+3. Recompute HMAC with same inputs
+4. Timing-safe comparison of provided vs expected HMAC
+
+### Usage
+- Public audio URL: `/api/ad-engine/audio/:scriptId/public?token=TOKEN`
+- Public image URL: `/api/ad-engine/images/:scriptId/:sceneNumber/public?token=TOKEN`
+- Secret: Uses `SESSION_SECRET` environment variable (falls back to `'ad-engine-assets'`)
+- TTL: 1 hour (3,600,000 milliseconds)
+
+---
+
+## Locked CTA
+
+When configured for Outpost Exchange, the call-to-action is hardcoded and must never vary:
+
+> "Don't be the butt of the joke. List your services on Outpost Exchange for free and don't pay a dime till the contract is signed."
+
+This CTA appears:
+- As the `resolution` and `brandClose` in every scenario arc
+- As the `brandClose.narration` in every generated script
+- As the final voiceover narration
+- As the final text overlay in rendered videos
+
+In **adaptive mode** (serving other brands), the CTA is dynamically generated based on the environment profile. The AI creates CTAs that match the host platform's brand, products, and audience. Generated CTAs are stored in `content_strategies.ctaTemplates` and can be manually overridden. The system generates 3-5 CTA options per environment and selects the best performer based on engagement data.
+
+---
+
+## Example Workflows
+
+### Workflow 1: "Generate a Video Ad from Scratch"
+
+```
+1. GET  /api/ad-engine/scenarios
+   → Receive 6 AI-generated humor scenarios with intelligence metadata
+   → Select scenario "Chrome Addiction — My Truck Has More Chrome Than My Bank Account"
+
+2. POST /api/ad-engine/scripts/generate
+   Body: { scenarioId: "chrome_addiction", format: "portrait" }
+   → Receive 3-scene script with narrations, visual descriptions, text overlays
+
+3. POST /api/ad-engine/scripts/:scriptId/voiceover
+   → Voiceover generated with "onyx" voice
+   → Receive audioUrl and publicAudioUrl
+
+4. POST /api/ad-engine/scripts/:scriptId/scenes/1/image
+   POST /api/ad-engine/scripts/:scriptId/scenes/2/image
+   POST /api/ad-engine/scripts/:scriptId/scenes/3/image
+   → Three photorealistic scene images generated
+
+5. POST /api/ad-engine/scripts/:scriptId/render
+   → FFmpeg assembles video with zoompan, crossfade, text overlays, audio
+   → Receive videoUrl and downloadUrl
+
+6. GET  /api/ad-engine/video/:scriptId/download
+   → Download final MP4 video file
+
+7. (Optional) POST /api/ad-engine/scripts/:scriptId/youtube-metadata
+   → AI generates title, description, tags
+   POST /api/ad-engine/scripts/:scriptId/youtube
+   → Upload directly to YouTube
+```
+
+### Workflow 2: "Research Competitors and Improve"
+
+```
+1. POST /api/youtube-research/scan
+   Body: { queries: ["contractor humor shorts", "blue collar comedy"], maxPerQuery: 25 }
+   → Scans YouTube, imports new benchmarks to humor_benchmarks table
+
+2. POST /api/youtube-research/analyze-batch
+   Body: { videoIds: ["dQw4w9WgXcQ", "abc123"], analyzeHumor: true }
+   → Detailed metrics + AI humor analysis for each video
+
+3. GET  /api/humor-screener/benchmarks
+   Query: ?style=relationship_spending&platform=youtube
+   → Review imported benchmarks filtered by style and platform
+
+4. GET  /api/ad-engine/scenarios
+   → Scenarios now incorporate benchmark data as intelligence source
+   → Each scenario shows confidenceScore and sourceMetrics from benchmarks
+   → Select data-driven scenario for next ad production
+```
+
+### Workflow 3: "Track Performance and Get Suggestions"
+
+```
+1. POST /api/humor-screener/performance
+   Body: {
+     humorCategory: "broke_boys",
+     title: "Broke Boys Roast Session",
+     platform: "youtube_shorts",
+     views: 45000, likes: 3200, comments: 890, shares: 450,
+     setupDuration: 2.1, punchlineTiming: 5.8,
+     deliveryPaceWps: 2.9, toneShiftCount: 2,
+     toneArc: "deadpan -> group_roast -> flat",
+     escalationBeats: [2.1, 4.0, 5.8],
+     retentionCurve: [{t:2,pct:95},{t:4,pct:88},{t:6,pct:72},{t:8,pct:65},{t:10,pct:58}]
+   }
+   → Performance data recorded with structural anatomy
+
+2. GET  /api/humor-screener/analytics
+   → Full dashboard: category rankings, top performers, platform breakdown,
+     pattern insights ("In Broke Boys, top performers have avg pace of 2.9 wps"),
+     retention analysis (critical drop-off at 8s),
+     5 AI suggestions referencing exact data
+
+3. POST /api/humor-screener/suggest
+   Body: { count: 5 }
+   → 5 new video concepts with structural blueprints:
+     { totalDuration: 12, beatTiming: "Setup: 0-2s, Hit: 2.5s...",
+       deliveryPace: 2.8, toneArc: "deadpan -> absurd -> flat",
+       retentionStrategy: "Fast visual hook in first 2s, tone shift at 5s" }
+```
+
+### Workflow 4: "Embedded in a Shopify Store"
+
+```
+1. Store owner installs VectorAS widget on their Shopify admin dashboard
+   Widget embed: <iframe src="https://vector-as.app/embed/pipeline?apiKey=sk_live_XXX&brand=auto" ...>
+
+2. POST /api/environment/discover
+   Body: { url: "https://joescustomwood.com" }
+   → VectorAS crawls the store:
+     - Discovers 23 products (dining tables, cutting boards, shelving units)
+     - Identifies industry: custom furniture / woodworking
+     - Extracts brand: "craftsman authentic, warm, pride in handwork"
+     - Profiles audience: homeowners 30-55, quality over quantity, buy-local mentality
+
+3. POST /api/strategy/generate
+   Body: { environmentId: "env_joes_wood" }
+   → AI generates content strategy:
+     - 5 custom humor categories: "ikea_vs_handmade", "wood_snob", "measure_twice", "customer_pinterest", "sawdust_life"
+     - 4 CTA templates: "Your table should outlast your mortgage. See what real craftsmen build at Joe's Custom Woodwork."
+     - Recommended formats: before/after transformations, workshop process reveals, wood species education
+
+4. POST /api/knowledge/research
+   Body: { query: "what kind of ads work best for selling custom furniture online" }
+   → VectorAS researches:
+     - YouTube: finds 15 relevant videos (furniture making timelapses, workshop tours, customer reveal reactions)
+     - Web: finds 3 articles about furniture marketing strategies
+     - Distills 4 knowledge entries:
+       - "Process videos (raw wood → finished piece) generate 4x engagement vs product photos"
+       - "Customer reaction reveal format consistently outperforms showcase format"
+
+5. GET /api/ad-engine/scenarios
+   → Scenarios now reflect Joe's products and audience:
+     - "IKEA vs Handmade — Why Your Dining Table Shouldn't Come With an Allen Wrench"
+     - "Sawdust Life — A Day in the Shop When Everything Goes Wrong (But the Table Comes Out Perfect)"
+
+6. Standard pipeline continues: script → voiceover → images → render
+   → But now the script references Joe's actual products, uses craftsman humor, targets his specific audience
+```
+
+---
+
+## Embeddable Widgets
+
+### 1. Production Pipeline Widget
+```html
+<iframe
+  src="https://vector-as.app/embed/pipeline?apiKey=XXX&brand=outpost"
+  width="100%"
+  height="800"
+  frameborder="0"
+></iframe>
+```
+Drop-in video production interface. Embeds the full scenario selection, script generation, voiceover, image generation, and render pipeline.
+
+#### Auto-Discovery Mode
+```html
+<iframe
+  src="https://vector-as.app/embed/pipeline?apiKey=XXX&brand=auto"
+  width="100%"
+  height="800"
+  frameborder="0"
+></iframe>
+```
+When `brand=auto`, the widget uses the environment profile associated with the API key to automatically configure brand identity, humor style, and content approach. When `brand=outpost` (or any specific brand), it uses the hardcoded Outpost Exchange configuration.
+
+### 2. Analytics Dashboard Widget
+```html
+<iframe
+  src="https://vector-as.app/embed/analytics?apiKey=XXX"
+  width="100%"
+  height="600"
+  frameborder="0"
+></iframe>
+```
+Humor performance analytics with category rankings, retention curves, pattern insights, and AI suggestions.
+
+### 3. Copy Assistant Widget
+```html
+<iframe
+  src="https://vector-as.app/embed/copy-assistant?apiKey=XXX"
+  width="100%"
+  height="700"
+  frameborder="0"
+></iframe>
+```
+AI copywriting chat interface for marketing content creation.
+
+### PostMessage Events (widget -> host)
+```javascript
+{ type: 'vectoras:video-rendered', scriptId: '...', videoUrl: '...' }
+{ type: 'vectoras:video-uploaded', scriptId: '...', youtubeUrl: '...' }
+{ type: 'vectoras:copy-ready', campaignId: '...', copyDraft: '...' }
+{ type: 'vectoras:pipeline-complete', jobId: '...', result: {...} }
+{ type: 'vectoras:environment-discovered', environmentId: '...', platformName: '...', productsFound: 12 }
+{ type: 'vectoras:knowledge-updated', entryId: '...', title: '...' }
+```
+
+---
+
+## Standalone Application UI Screens
+
+### Public Pages
+1. **Landing Page** (`/`) — Explains VectorAS, three CTAs: "Create Account", "API Documentation", "See It In Action"
+2. **How It Works** (`/how-it-works`) — Visual pipeline walkthrough (scenario -> script -> voiceover -> images -> video)
+3. **API Docs** (`/docs`) — REST API reference for developers
+
+### Authenticated Pages
+4. **Dashboard** (`/dashboard`) — Overview: recent ads, performance summary, pipeline status
+5. **Ad Studio** (`/studio`) — Full ad production interface (scenarios, scripts, assets, render)
+6. **Comparison Ads** (`/studio/comparisons`) — Before/after comparison ad production
+7. **Humor Screener** (`/analytics`) — Performance tracking, category rankings, retention analysis
+8. **Benchmarks** (`/analytics/benchmarks`) — Competitor benchmark library
+9. **YouTube Research** (`/research`) — Scan and analyze competitor content
+10. **Copy Assistant** (`/copy`) — Campaign management and AI copywriting
+11. **Video Library** (`/videos`) — Generated videos with queue status
+12. **Profile** (`/profile`) — Account settings, creative profile
+
+### Admin Pages
+13. **Admin Dashboard** (`/admin`) — Platform-wide production stats, queue health, alerts
+14. **API Keys** (`/admin/api-keys`) — Manage API keys for external integrations
+
+15. **Environment Discovery** (`/environment`) — View and manage discovered platform environments
+16. **Product Inventory** (`/environment/:id/products`) — View discovered products with AI tags and content angles
+17. **Knowledge Base** (`/knowledge`) — Browse, search, and manage learned knowledge entries
+18. **Research Hub** (`/research/hub`) — Execute user-promoted research queries, view research history
+19. **Content Strategy** (`/strategy/:environmentId`) — View and adjust content strategy, generated humor categories, CTA templates
+
+---
+
+## Environment Variables Required
+
+```
+DATABASE_URL                        — PostgreSQL connection string
+OPENAI_API_KEY                      — Direct OpenAI API key (used for GPT-Image-1 image generation)
+AI_INTEGRATIONS_OPENAI_API_KEY      — OpenAI API key (for text generation, TTS, analytics)
+AI_INTEGRATIONS_OPENAI_BASE_URL     — OpenAI API base URL (for proxy/custom endpoints)
+YOUTUBE_API_KEY                     — YouTube Data API v3 key (for competitor research)
+SEARCH_API_KEY                     — Web search API key (Google Custom Search or Bing Web Search)
+SEARCH_ENGINE_ID                   — Google Custom Search engine ID (if using Google)
+SESSION_SECRET                      — Secret for HMAC asset token generation
+```
+
+### YouTube OAuth2 Credentials (stored in platform_settings table)
+```
+user_youtube_client_id              — OAuth2 client ID for YouTube upload
+user_youtube_client_secret          — OAuth2 client secret for YouTube upload
+user_youtube_refresh_token          — OAuth2 refresh token for YouTube upload
+```
+
+---
+
+## Rate Limiting
+
+| Subsystem | Limit | Window |
+|-----------|-------|--------|
+| Ad Engine (all routes with `adEngineLimiter`) | 30 requests | 1 minute per IP |
+| Studio Chat (`/api/studio/campaigns/:campaignId/chat`) | 10 requests | 1 minute per IP |
+
+Both use `express-rate-limit` with standard headers enabled and legacy headers disabled.
+
+---
+
+## File Storage
+
+| Directory | Purpose | Lifecycle |
+|-----------|---------|-----------|
+| `generated_ads/` | Final rendered ad videos (MP4) and thumbnails (JPG) | Persistent |
+| `temp_ad_assets/` | Voiceover MP3s, scene PNGs, concat files during ad production | Cleaned per-script after render |
+| `generated_videos/` | Final rendered generic videos (MP4) and thumbnails (JPG) | Persistent |
+| `temp_video_assets/` | Scene images, voiceover, concat files during generic video production | Cleaned per-video after assembly |
+
+### Cleanup Rules
+- Ad Engine: `cleanupAdTempFiles(scriptId)` removes all files starting with scriptId from `temp_ad_assets/`
+- Generic Pipeline: `cleanupTempFiles(videoId)` removes all files starting with videoId from `temp_video_assets/`
+- Cleanup runs after successful render or on pipeline completion
+- Stale queue jobs (10-minute timeout) trigger cleanup on failure
+
+---
+
+## Key Implementation Notes
+
+1. **This is a web app, not a mobile app.** Use React (create-react-app or Vite), NOT React Native or Expo. The UI runs in browsers.
+
+2. **Two OpenAI clients are used.** The `openai` client uses `AI_INTEGRATIONS_OPENAI_API_KEY` with `AI_INTEGRATIONS_OPENAI_BASE_URL` for text generation, TTS, and analytics. The `openaiDirect` client uses `OPENAI_API_KEY` (direct, no proxy) for GPT-Image-1 image generation because image generation requires direct API access.
+
+3. **Scripts are stored in-memory.** Active scripts live in a `Map<string, AdScript>()` — they are NOT persisted to database. This is by design for the ad production workflow (scripts are ephemeral until video is rendered). The rendered video file is the persistent artifact.
+
+4. **Pipeline jobs are also in-memory.** Async pipeline jobs live in a `Map<string, PipelineJob>()` — they are session-scoped and will not survive server restarts.
+
+5. **The humor categories are locked.** The 10 categories must not be modified, added to, or removed. Every ad script must map to exactly one of these categories. The categories are defined as a TypeScript const array for type safety.
+
+6. **Engagement rate is auto-calculated.** When recording performance data, the server calculates `engagementRate = ((likes + comments + shares) / views) * 100` — it does not trust client-provided engagement rates.
+
+7. **Video streaming supports HTTP range requests.** The stream endpoint implements proper `206 Partial Content` responses for video seeking in browsers.
+
+8. **YouTube upload requires pre-configured OAuth2.** The refresh token, client ID, and client secret must be stored in the `platform_settings` table before upload will work. The server refreshes the access token before each upload.
+
+9. **Pattern insights require at least 2 records per category.** The quartile comparison analysis only runs when a humor category has 2+ performance records with anatomy data.
+
+10. **Retention analysis uses common timestamps.** The system analyzes retention at [2, 4, 6, 8, 10, 12, 14] second marks, finding the closest data point within 1 second tolerance.
+
+11. **Environment discovery runs asynchronously.** When a new API key connects or a widget embeds, the crawl runs in the background. Content generation works with whatever data is available — if the environment profile is incomplete, the AI asks users to fill in gaps.
+
+12. **Knowledge entries have TTL with active-use extension.** Default TTL is 6 months. Every time a knowledge entry is used in content generation, its TTL resets. Unused knowledge decays naturally. Trend-based knowledge has a shorter 30-day TTL.
+
+13. **The 10 contractor humor categories are immutable defaults, not the only categories.** When serving non-contractor audiences, the system generates new categories using the same structure. These generated categories are stored per-environment and evolve based on performance data.
+
+14. **Web search requires a search API.** The evolving knowledge base and adaptive research features require a web search API integration (e.g., Google Custom Search API, Bing Web Search API, or similar). If no web search API is configured, the system falls back to YouTube-only research.
+
+15. **Environment crawling respects robots.txt and rate limits.** The platform discovery crawler follows standard web crawling ethics — respects robots.txt, uses reasonable delays between requests, and identifies itself in the User-Agent header.
+
+---
+
+## Separation from Host Platform
+
+VectorAS must NOT contain or depend on:
+- Listings or listing management (that's the marketplace's job)
+- Service/equipment categories (marketplace concern)
+- Search or discovery features
+- Contract lifecycle management (that's VectorOS's job)
+- Payment processing for contracts
+- Dispute resolution
+- Subscription management
+- Social features (followers, activity feeds)
+
+VectorAS DOES reference `listingId` as an optional foreign key in campaigns for marketplace integration, but it never creates, queries, or manages listings itself. When a host platform passes a `listingId`, VectorAS stores it for context but treats it as an opaque reference.
+
+VectorAS integrates WITH VectorOS indirectly — the locked CTA drives users to sign contracts (handled by VectorOS), but VectorAS has no direct dependency on VectorOS APIs or schema.
+
+---
+
+## Summary
+
+Build VectorAS as a standalone Express.js + React web application with:
+- Its own auth system (phone-verified accounts)
+- PostgreSQL database with the full schema (humor_performance, humor_benchmarks, video_queue, performance_alerts, studio_campaigns, studio_videos, environment_profiles, product_inventory, knowledge_entries, research_queries, content_strategies, audience_insights, and supporting tables)
+- All 64+ API routes implementing ad production, comedy analytics, YouTube research, copy assistant, environment discovery, knowledge base, and content strategy
+- **Environment Discovery Engine** — auto-detects host platform, products, brand identity, and audience when embedded
+- **Adaptive Research Engine** — generates dynamic research queries based on discovered products, not hardcoded terms
+- **Evolving Knowledge Base** — learns from performance data, user-promoted research, and web intelligence
+- **Audience Intelligence Engine** — calibrates humor style, tone, and content approach per product and audience
+- Dark steel industrial UI (NOT warm/parchment — this is "Dark Steel & Sarcasm")
+- OpenAI integration for script generation, voiceover, image generation, analytics, environment analysis, and copywriting
+- FFmpeg video assembly pipeline with zoompan, crossfade, text overlays, and audio mixing
+- YouTube Data API integration for competitor research and video upload
+- Web search API integration for market intelligence and trend tracking
+- Embeddable widget system with automatic environment detection
+- REST API with API key authentication for external platforms
+- Video queue system with performance monitoring and alerts
+- HMAC-based asset token security for public asset access
+- Knowledge decay system with active-use TTL extension
+- Cross-tenant anonymized performance pattern learning
